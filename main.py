@@ -1,6 +1,9 @@
 import logging
+import threading
+import telegram
 
-from transitions import Machine
+from time import sleep
+from transitions.extensions import LockedMachine as Machine
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
 
@@ -12,24 +15,51 @@ logger = logging.getLogger(__name__)
 
 
 class BotFSM:
-    states = ['init', 'start', 'ask', 'long']
+    states = ['init', 'started', 'asked', 'waiting', 'classifying']
 
-    def __init__(self):
+    def __init__(self, bot):
         self.machine = Machine(model=self, states=BotFSM.states, initial='init')
 
-        self.machine.add_transition('start', 'init', 'start')
-        self.machine.add_transition('ask_question', 'start', 'ask')
-        self.machine.add_transition('long_waiting', 'ask', 'long')
-        self.machine.add_transition('too_long_waiting', 'long', 'long')
+        self.machine.add_transition('start', 'init', 'started', after='wait_for_user_typing')
+        self.machine.add_transition('ask_question', 'started', 'asked', after='ask_question_to_user')
+        self.machine.add_transition('classifying', 'asked', 'classifying')
+        self.machine.add_transition('long_waiting', 'asked', 'waiting', after='say_user_about_long_waiting')
+        self.machine.add_transition('too_long_waiting', 'waiting', 'waiting')
+        self._chat = None
+        self._bot = bot
 
-    def start(self):
-        print("Begining the journey!")
+    def wait_for_user_typing(self):
+        def _wait():
+            slept = 0
 
-    def ask_question(self):
-        print("How are you?")
+            while True:
+                sleep(1)
+                slept += 1
+                if self.is_started() and slept > 10:
+                    self.ask_question()
+                    slept = 0
 
-    def long_waiting(self):
-        print("Please, type something. I'm scaried.")
+        t = threading.Thread(target=_wait)
+        t.start()
+
+    def ask_question_to_user(self):
+        def _wait():
+            slept = 0
+
+            while True:
+                sleep(1)
+                slept += 1
+                if self.is_asked() and slept > 15:
+                    self.long_waiting()
+                    slept = 0
+        self._bot.send_message(self._chat.id, "I'm working!! And asking you a question...")
+        self._bot.send_message(self._chat.id, "How are you?")
+
+        t = threading.Thread(target=_wait)
+        t.start()
+
+    def say_user_about_long_waiting(self):
+        self._bot.send_message(self._chat.id, "Why you're not answering? Am I bother you?(")
 
     def too_long_waiting(self):
         print("Why so silence?")
@@ -51,9 +81,10 @@ class Bot:
          " football in the country.")
 
     def __init__(self):
-        self._fsm = BotFSM()
         token = "381793449:AAEogsUmzwqgBQiIz6OmdzWOY6iU_GwATeI"
-        self._updater = Updater(token)
+        self._bot = telegram.Bot(token)
+        self._fsm = BotFSM(self._bot)
+        self._updater = Updater(bot=self._bot)
 
         dp = self._updater.dispatcher
         dp.add_handler(CommandHandler("start", self._start_cmd))
@@ -79,7 +110,10 @@ class Bot:
         update.message.reply_text("The text: \"{}\"".format(Bot.text))
         update.message.reply_text("Also you can the get text by typing /text command")
 
+        self._fsm = BotFSM(self._bot)
+        self._fsm._chat = update.effective_chat
         self._fsm.start()
+
 
     def _help_cmd(self, bot, update):
         message = ("\start - shows greeting message\n"
@@ -93,10 +127,13 @@ class Bot:
     def _echo_cmd(self, bot, update):
         self._save_chat_info(update)
 
-        if self._fsm.state == 'init':
+        if self._fsm.is_init():
             update.message.reply_text(
                 "{}, please type /start to begin the journey.".format(self._user_first_name)
             )
+        elif self._fsm.is_asked():
+            self._fsm.classifying()
+            update.message.reply_text("Thanks for the answer! {}, now wait!".format(self._user_first_name))
         else:
             update.message.reply_text("You type me: {}".format(update.message.text))
 
