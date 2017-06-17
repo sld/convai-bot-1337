@@ -10,15 +10,21 @@ logger = logging.getLogger(__name__)
 
 
 class FSM:
-    states = ['init', 'started', 'asked', 'waiting', 'classifying', 'ending',
-      'checking_answer', 'correct_answer', 'incorrect_answer']
-    wait_messages = ["Why you're not answering? Am I bother you?(",
-     "Please, answer to me.", "Why so silence?",
-     "Please, answer to me. It gives me an energy to live"]
+    states = [
+      'init', 'started', 'asked', 'waiting', 'classifying', 'ending', 'checking_answer',
+      'correct_answer', 'incorrect_answer', 'bot_answering_question', 'bot_answering_replica',
+      'bot_correct_answer', 'bot_incorrect_answer'
+    ]
+    wait_messages = ["Why you're not speaking? Am I bother you?(",
+     "Please, speak with me.", "Why you're not typing anything?",
+     "Please, speak with me. It gives me energy to live"]
 
-    CLASSIFY_ANSWER = 'a'
-    CLASSIFY_QUESTION = 'q'
-    CLASSIFY_REPLICA = 'r'
+    CLASSIFY_ANSWER = 'ca'
+    CLASSIFY_QUESTION = 'cq'
+    CLASSIFY_REPLICA = 'cr'
+    ANSWER_CORRECT = 'ac'
+    ANSWER_INCORRECT = 'ai'
+
     WAIT_TIME = 10
     WAIT_TOO_LONG = 15
 
@@ -36,11 +42,15 @@ class FSM:
         self.machine.add_transition('check_user_answer', 'classifying', 'checking_answer', after='checking_user_answer')
         self.machine.add_transition('correct_user_answer', 'checking_answer', 'correct_answer')
         self.machine.add_transition('incorrect_user_answer', 'checking_answer', 'incorrect_answer')
-        self.machine.add_transition('return_to_start', 'correct_answer', 'started', after='wait_for_user_typing')
-        self.machine.add_transition('return_to_wait', 'incorrect_answer', 'waiting', after='say_user_about_long_waiting')
+        self.machine.add_transition('return_to_start', '*', 'started', after='wait_for_user_typing')
+        self.machine.add_transition('return_to_wait', '*', 'waiting', after='say_user_about_long_waiting')
 
-        self.machine.add_transition('answer_to_user_question', 'classifying', 'bot_answering_question')
-        self.machine.add_transition('answer_to_user_replica', 'classifying', 'bot_answering_replica')
+        self.machine.add_transition('answer_to_user_question', 'classifying', 'bot_answering_question', after='answer_to_user_question_')
+        self.machine.add_transition('classify', 'bot_answering_question', 'classifying', after='get_klass_of_user_message')
+        self.machine.add_transition('answer_to_user_question_correct', 'bot_answering_question', 'bot_correct_answer')
+        self.machine.add_transition('answer_to_user_question_incorrect', 'bot_answering_question', 'bot_incorrect_answer')
+
+        self.machine.add_transition('answer_to_user_replica', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_')
 
         self.machine.add_transition('long_wait', 'asked', 'waiting', after='say_user_about_long_waiting')
         self.machine.add_transition('too_long_wait', 'waiting', 'waiting', after='say_user_about_long_waiting')
@@ -120,20 +130,15 @@ class FSM:
             reply_markup=reply_markup
         )
 
-    def classify_user_utterance(self, clf_type):
+    def _classify_user_utterance(self, clf_type):
         self._cancel_timer_threads()
 
         if clf_type == FSM.CLASSIFY_ANSWER:
             self.check_user_answer()
         elif clf_type == FSM.CLASSIFY_QUESTION:
             self.answer_to_user_question()
-            self._bot.send_message(chat_id=self._chat.id, text="42?")
         elif clf_type == FSM.CLASSIFY_REPLICA:
             self.answer_to_user_replica()
-            self._bot.send_message(
-                chat_id=self._chat.id,
-                text="How are you, {}?".format(self._user.first_name)
-            )
 
     def checking_user_answer(self):
         self._cancel_timer_threads()
@@ -152,10 +157,52 @@ class FSM:
             self.incorrect_user_answer()
             self.return_to_wait()
 
-    def _send_message(self, text):
+    def answer_to_user_question_(self):
+        self._cancel_timer_threads()
+
+        keyboard = [
+            [telegram.InlineKeyboardButton("Correct", callback_data=FSM.ANSWER_CORRECT),
+             telegram.InlineKeyboardButton("Incorrect", callback_data=FSM.ANSWER_INCORRECT)]
+        ]
+        reply_markup = telegram.InlineKeyboardMarkup(keyboard)
+        if self._last_user_message == 'How are you?':
+            ans = "I'm fine thanks!"
+        else:
+            ans = "43"
+        self._send_message("My answer is: \"{}\"".format(ans), reply_markup=reply_markup)
+
+    def answer_to_user_replica_(self):
+        self._cancel_timer_threads()
+        self._send_message("Blah blah blah...")
+        self.return_to_wait()
+
+    def go_from_choices(self, query_data):
+        self._cancel_timer_threads()
+
+        assert query_data[0] in ['c', 'a']
+
+        if query_data[0] == 'c':
+            self._classify_user_utterance(query_data)
+        elif query_data[0] == 'a':
+            self._classify_user_response_to_bot_answer(query_data)
+
+    def _classify_user_response_to_bot_answer(self, clf_type):
+        self._cancel_timer_threads()
+
+        if clf_type == FSM.ANSWER_CORRECT:
+            self.answer_to_user_question_correct()
+            self._send_message("Hooray! I'm smart!")
+        elif clf_type == FSM.ANSWER_INCORRECT:
+            self.answer_to_user_question_incorrect()
+            self._send_message(("Maybe 42? Sorry, I don't know the answer :(\n"
+                                "I hope my master will make me smarter."))
+        self.return_to_start()
+
+    def _send_message(self, text, reply_markup=None):
         self._bot.send_message(
             chat_id=self._chat.id,
-            text=text
+            text=text,
+            reply_markup=reply_markup
         )
 
     def _cancel_timer_threads(self, presereve_cntr=False):

@@ -9,6 +9,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
+version = "1 (18.06.2017)"
 
 
 class DialogTracker:
@@ -67,9 +68,11 @@ class DialogTracker:
     def _help_cmd(self, bot, update):
         self._add_fsm_and_user(update)
 
-        message = ("\start - shows greeting message and start chat\n"
-                   "\\text - shows the text\n"
-                   "\help - shows this message.")
+        message = ("/start - starts the chat\n"
+                   "/text - shows a text to discuss\n"
+                   "/help - shows this message.\n"
+                   "\n"
+                   "Version: {}".format(version))
         update.message.reply_text(message)
 
     def _text_cmd(self, bot, update):
@@ -93,15 +96,14 @@ class DialogTracker:
             fsm.classify()
         else:
             fsm.classify()
-            update.message.reply_text("You type me: {}".format(update.message.text))
 
     def _button(self, bot, update):
         query = update.callback_query
 
-        bot.edit_message_text(text="Thanks!",
+        bot.edit_message_text(text="Thank you, {}!".format(self._user_name(update)),
                               chat_id=query.message.chat_id,
                               message_id=query.message.message_id)
-        self._users_fsm[update.effective_user.id].classify_user_utterance(query.data)
+        self._users_fsm[update.effective_user.id].go_from_choices(query.data)
 
     def _add_fsm_and_user(self, update, hard=False):
         if hard or update.effective_user.id not in self._users_fsm:
