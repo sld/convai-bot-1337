@@ -1,71 +1,17 @@
 import logging
-import threading
 import telegram
 
 from time import sleep
-from transitions.extensions import LockedMachine as Machine
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from fsm import FSM
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
 
-# Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
-
 logger = logging.getLogger(__name__)
 
 
-class BotFSM:
-    states = ['init', 'started', 'asked', 'waiting', 'classifying']
-
-    def __init__(self, bot):
-        self.machine = Machine(model=self, states=BotFSM.states, initial='init')
-
-        self.machine.add_transition('start', 'init', 'started', after='wait_for_user_typing')
-        self.machine.add_transition('ask_question', 'started', 'asked', after='ask_question_to_user')
-        self.machine.add_transition('classifying', 'asked', 'classifying')
-        self.machine.add_transition('long_waiting', 'asked', 'waiting', after='say_user_about_long_waiting')
-        self.machine.add_transition('too_long_waiting', 'waiting', 'waiting')
-        self._chat = None
-        self._bot = bot
-
-    def wait_for_user_typing(self):
-        def _wait():
-            slept = 0
-
-            while True:
-                sleep(1)
-                slept += 1
-                if self.is_started() and slept > 10:
-                    self.ask_question()
-                    slept = 0
-
-        t = threading.Thread(target=_wait)
-        t.start()
-
-    def ask_question_to_user(self):
-        def _wait():
-            slept = 0
-
-            while True:
-                sleep(1)
-                slept += 1
-                if self.is_asked() and slept > 15:
-                    self.long_waiting()
-                    slept = 0
-        self._bot.send_message(self._chat.id, "I'm working!! And asking you a question...")
-        self._bot.send_message(self._chat.id, "How are you?")
-
-        t = threading.Thread(target=_wait)
-        t.start()
-
-    def say_user_about_long_waiting(self):
-        self._bot.send_message(self._chat.id, "Why you're not answering? Am I bother you?(")
-
-    def too_long_waiting(self):
-        print("Why so silence?")
-
-
-class Bot:
+class DialogTracker:
     text =  ("The Notre Dame football team has a long history, first beginning"
          " when the Michigan Wolverines football team brought football to Notre Dame in"
          " 1887 and played against a group of students. In the long history since then,"
@@ -83,7 +29,6 @@ class Bot:
     def __init__(self):
         token = "381793449:AAEogsUmzwqgBQiIz6OmdzWOY6iU_GwATeI"
         self._bot = telegram.Bot(token)
-        self._fsm = BotFSM(self._bot)
         self._updater = Updater(bot=self._bot)
 
         dp = self._updater.dispatcher
@@ -92,7 +37,12 @@ class Bot:
         dp.add_handler(CommandHandler("text", self._text_cmd))
 
         dp.add_handler(MessageHandler(Filters.text, self._echo_cmd))
+
+        dp.add_handler(CallbackQueryHandler(self._button))
         dp.add_error_handler(self._error)
+
+        self._users_fsm = {}
+        self._users = {}
 
     def start(self):
         self._updater.start_polling()
@@ -107,44 +57,66 @@ class Bot:
                    " Type /help to get some more information.")
         update.message.reply_text(message)
 
-        update.message.reply_text("The text: \"{}\"".format(Bot.text))
+        update.message.reply_text("The text: \"{}\"".format(DialogTracker.text))
         update.message.reply_text("Also you can the get text by typing /text command")
 
-        self._fsm = BotFSM(self._bot)
-        self._fsm._chat = update.effective_chat
-        self._fsm.start()
-
+        self._add_fsm_and_user(update, True)
+        fsm = self._users_fsm[update.effective_user.id]
+        fsm.start()
 
     def _help_cmd(self, bot, update):
-        message = ("\start - shows greeting message\n"
+        self._add_fsm_and_user(update)
+
+        message = ("\start - shows greeting message and start chat\n"
                    "\\text - shows the text\n"
                    "\help - shows this message.")
         update.message.reply_text(message)
 
     def _text_cmd(self, bot, update):
-        update.message.reply_text("The text: \"{}\"".format(Bot.text))
+        self._add_fsm_and_user(update)
+
+        update.message.reply_text("The text: \"{}\"".format(DialogTracker.text))
 
     def _echo_cmd(self, bot, update):
-        self._save_chat_info(update)
+        self._add_fsm_and_user(update)
 
-        if self._fsm.is_init():
+        username = self._user_name(update)
+        fsm = self._users_fsm[update.effective_user.id]
+        fsm._last_user_message = update.message.text
+
+        if fsm.is_init():
             update.message.reply_text(
-                "{}, please type /start to begin the journey.".format(self._user_first_name)
+                "{}, please type /start to begin the journey.".format(username)
             )
-        elif self._fsm.is_asked():
-            self._fsm.classifying()
-            update.message.reply_text("Thanks for the answer! {}, now wait!".format(self._user_first_name))
+            update.message.reply_text("Also, you can type /help to get help")
+        elif fsm.is_asked():
+            fsm.classify()
         else:
+            fsm.classify()
             update.message.reply_text("You type me: {}".format(update.message.text))
 
-    def _save_chat_info(self, update):
-        self._user_first_name = update.effective_user.first_name
+    def _button(self, bot, update):
+        query = update.callback_query
+
+        bot.edit_message_text(text="Thanks!",
+                              chat_id=query.message.chat_id,
+                              message_id=query.message.message_id)
+        self._users_fsm[update.effective_user.id].classify_user_utterance(query.data)
+
+    def _add_fsm_and_user(self, update, hard=False):
+        if hard or update.effective_user.id not in self._users_fsm:
+            fsm = FSM(self._bot, update.effective_chat, update.effective_user)
+            self._users_fsm[update.effective_user.id] = fsm
+            self._users[update.effective_user.id] = update.effective_user
 
     def _error(self, bot, update, error):
         logger.warn('Update "%s" caused error "%s"' % (update, error))
 
+    def _user_name(self, update):
+        return self._users[update.effective_user.id].first_name
+
 
 if __name__ == '__main__':
-    bot = Bot()
-    bot.start()
+    dt = DialogTracker()
+    dt.start()
 
