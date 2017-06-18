@@ -27,7 +27,8 @@ class DialogTracker:
 
         dp = self._updater.dispatcher
         dp.add_handler(CommandHandler("start", self._start_cmd))
-        dp.add_handler(CommandHandler("reset", self._start_cmd))
+        dp.add_handler(CommandHandler("reset", self._reset_cmd))
+        dp.add_handler(CommandHandler("stop", self._reset_cmd))
         dp.add_handler(CommandHandler("factoid_question", self._factoid_question_cmd))
         dp.add_handler(CommandHandler("help", self._help_cmd))
         dp.add_handler(CommandHandler("text", self._text_cmd))
@@ -45,6 +46,15 @@ class DialogTracker:
     def start(self):
         self._updater.start_polling()
         self._updater.idle()
+
+    def _reset_cmd(self, bot, update):
+        self._add_fsm_and_user(update)
+        fsm.return_to_init()
+        update.message.reply_text(
+            "{}, please type /start to begin the journey {}".format(username, telegram.Emoji.MOUNTAIN_RAILWAY)
+        )
+        update.message.reply_text("Also, you can type /help to get help")
+
 
     def _factoid_question_cmd(self, bot, update):
         self._add_fsm_and_user(update)
@@ -89,7 +99,8 @@ class DialogTracker:
                    "/text - shows current text to discuss\n"
                    "/factoid_question - bot asks factoid question about text\n"
                    "/help - shows this message\n"
-                   "/reset - reset (the same as /start)\n"
+                   "/reset - reset the bot\n"
+                   "/stop - stop the bot\n"
                    "\n"
                    "Version: {}".format(version))
         update.message.reply_text(message)
@@ -124,10 +135,12 @@ class DialogTracker:
         self._users_fsm[update.effective_user.id].go_from_choices(query.data)
 
     def _add_fsm_and_user(self, update, hard=False):
-        if hard or update.effective_user.id not in self._users_fsm:
+        if update.effective_user.id not in self._users_fsm:
             fsm = FSM(self._bot, update.effective_chat, update.effective_user, self._text_and_qa())
             self._users_fsm[update.effective_user.id] = fsm
             self._users[update.effective_user.id] = update.effective_user
+        elif update.effective_user.id in self._users_fsm and hard:
+            self._users_fsm[update.effective_user.id].clear_all()
 
     def _error(self, bot, update, error):
         logger.warn('Update "%s" caused error "%s"' % (update, error))

@@ -50,6 +50,7 @@ class FSM:
         self.machine.add_transition('incorrect_user_answer', 'checking_answer', 'incorrect_answer')
         self.machine.add_transition('return_to_start', '*', 'started', after='wait_for_user_typing')
         self.machine.add_transition('return_to_wait', '*', 'waiting', after='say_user_about_long_waiting')
+        self.machine.add_transition('return_to_init', '*', 'init', after='clear_all')
 
         self.machine.add_transition('answer_to_user_question', 'classifying', 'bot_answering_question', after='answer_to_user_question_')
         self.machine.add_transition('classify', 'bot_answering_question', 'classifying', after='get_klass_of_user_message')
@@ -269,3 +270,6 @@ class FSM:
         s = "{}{}".format(s[0].upper(), s[1:])
         s = "'".join([w.strip() for w in s.split("'")])
         return s
+
+    def clear_all(self):
+        self._cancel_timer_threads()
