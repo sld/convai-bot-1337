@@ -65,6 +65,7 @@ class FSM:
         self.__last_user_message = None
         self._threads = []
         self._init_factoid_qas()
+        self._seq2seq_context = []
 
     def _init_factoid_qas(self):
         self._factoid_qas = [
@@ -75,7 +76,7 @@ class FSM:
         self._qa_ind = -1
 
     def wait_for_user_typing(self):
-        self._cancel_timer_threads(reset_question=False)
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
         def _ask_question_if_user_inactive():
             if self.is_started():
@@ -103,7 +104,7 @@ class FSM:
         self._qa_ind = (self._qa_ind + 1) % len(self._factoid_qas)
 
     def say_user_about_long_waiting(self):
-        self._cancel_timer_threads(reset_question=False, presereve_cntr=True)
+        self._cancel_timer_threads(reset_question=False, presereve_cntr=True, reset_seq2seq_context=False)
 
         def _too_long_waiting_if_user_inactive():
             if self.is_waiting() and self._too_long_waiting_cntr < 4:
@@ -128,7 +129,7 @@ class FSM:
                                                "Type /start to replay."))
 
     def get_klass_of_user_message(self):
-        self._cancel_timer_threads(reset_question=False)
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
         self._bot.send_message(self._chat.id, ("I'm trying to classify your message"
                                                " to give correct answer"))
@@ -146,7 +147,7 @@ class FSM:
         )
 
     def _classify_user_utterance(self, clf_type):
-        self._cancel_timer_threads(reset_question=False)
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
         if clf_type == FSM.CLASSIFY_ANSWER and self._question_asked:
             self.check_user_answer()
@@ -202,12 +203,19 @@ class FSM:
         return random.sample(res.split(' '), 1)[0]
 
     def answer_to_user_replica_(self):
-        self._cancel_timer_threads()
-        self._send_message("Blah blah blah...")
+        self._cancel_timer_threads(reset_seq2seq_context=False)
+        self._seq2seq_context.append(self._last_user_message)
+        bots_answer = self._get_seq2seq_reply()
+        self._seq2seq_context.append(bots_answer)
+        self._send_message(bots_answer)
         self.return_to_wait()
 
+    def _get_seq2seq_reply(self):
+        context = " ".join(self._seq2seq_context)
+        return random.sample(context.split(' '), 1)[0]
+
     def go_from_choices(self, query_data):
-        self._cancel_timer_threads(reset_question=False)
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
         assert query_data[0] in ['c', 'a']
 
@@ -235,11 +243,14 @@ class FSM:
             reply_markup=reply_markup
         )
 
-    def _cancel_timer_threads(self, presereve_cntr=False, reset_question=True):
+    def _cancel_timer_threads(self, presereve_cntr=False, reset_question=True, reset_seq2seq_context=True):
         if not presereve_cntr:
             self._too_long_waiting_cntr = 0
 
         if reset_question:
             self._question_asked = False
+
+        if reset_seq2seq_context:
+            self._seq2seq_context = []
         [t.cancel() for t in self._threads]
 

@@ -34,6 +34,7 @@ class DialogTracker:
 
         dp = self._updater.dispatcher
         dp.add_handler(CommandHandler("start", self._start_cmd))
+        dp.add_handler(CommandHandler("factoid_question", self._factoid_question_cmd))
         dp.add_handler(CommandHandler("help", self._help_cmd))
         dp.add_handler(CommandHandler("text", self._text_cmd))
 
@@ -49,12 +50,28 @@ class DialogTracker:
         self._updater.start_polling()
         self._updater.idle()
 
+    def _factoid_question_cmd(self, bot, update):
+        self._add_fsm_and_user(update)
+
+        username = self._user_name(update)
+        fsm = self._users_fsm[update.effective_user.id]
+        fsm._last_user_message = update.message.text
+
+        if fsm.is_init():
+            update.message.reply_text(
+                "{}, please type /start to begin the journey.".format(username)
+            )
+            update.message.reply_text("Also, you can type /help to get help")
+        else:
+            fsm.return_to_start()
+            fsm.ask_question()
+
     def _start_cmd(self, bot, update):
         message = 'Hello Mighty {}!'.format(update.effective_user.first_name)
         update.message.reply_text(message)
 
-        message = ("I'm Convai.io bot #1337. My main goal is to talk about the text"
-                   " I provided below. You can ask me questions about the text or I can do the same."
+        message = ("I'm Convai.io bot#1337. My main goal is to talk about the text"
+                   " provided below. You can ask me questions about the text or I can do the same."
                    " Type /help to get some more information.")
         update.message.reply_text(message)
 
@@ -70,6 +87,7 @@ class DialogTracker:
 
         message = ("/start - starts the chat\n"
                    "/text - shows a text to discuss\n"
+                   "/factoid_question - bot asks factoid question about text\n"
                    "/help - shows this message.\n"
                    "\n"
                    "Version: {}".format(version))
