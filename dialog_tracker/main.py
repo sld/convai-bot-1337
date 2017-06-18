@@ -49,6 +49,7 @@ class DialogTracker:
 
     def _reset_cmd(self, bot, update):
         self._add_fsm_and_user(update)
+        fsm = self._users_fsm[update.effective_user.id]
         fsm.return_to_init()
         username = self._user_name(update)
         update.message.reply_text(
