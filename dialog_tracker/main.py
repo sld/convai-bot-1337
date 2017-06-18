@@ -1,6 +1,7 @@
 import logging
 import telegram
 
+from random import sample
 from time import sleep
 from fsm import FSM
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
@@ -10,6 +11,13 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 version = "1 (18.06.2017)"
+
+
+class StoriesHandler:
+    def __init__(self, filename="data/train-v1.1.json"):
+        with open(filename) as f:
+            dataset = json.load(f)
+        self.stories = [par["context"] for text in dataset["data"] for par in text["paragraphs"]]
 
 
 class DialogTracker:
@@ -34,6 +42,7 @@ class DialogTracker:
 
         dp = self._updater.dispatcher
         dp.add_handler(CommandHandler("start", self._start_cmd))
+        dp.add_handler(CommandHandler("reset", self._start_cmd))
         dp.add_handler(CommandHandler("factoid_question", self._factoid_question_cmd))
         dp.add_handler(CommandHandler("help", self._help_cmd))
         dp.add_handler(CommandHandler("text", self._text_cmd))
@@ -59,7 +68,7 @@ class DialogTracker:
 
         if fsm.is_init():
             update.message.reply_text(
-                "{}, please type /start to begin the journey.".format(username)
+                "{}, please type /start to begin the journey {}".format(username, telegram.Emoji.MOUNTAIN_RAILWAY)
             )
             update.message.reply_text("Also, you can type /help to get help")
         else:
@@ -67,11 +76,12 @@ class DialogTracker:
             fsm.ask_question()
 
     def _start_cmd(self, bot, update):
-        message = 'Hello Mighty {}!'.format(update.effective_user.first_name)
+        message = 'Hi {}!'.format(update.effective_user.first_name)
         update.message.reply_text(message)
 
         message = ("I'm Convai.io bot#1337. My main goal is to talk about the text"
-                   " provided below. You can ask me questions about the text or I can do the same."
+                   " provided below. You can ask me questions about the text,"
+                   " give answers to my questions and even chit-chat about anything."
                    " Type /help to get some more information.")
         update.message.reply_text(message)
 
@@ -87,9 +97,10 @@ class DialogTracker:
         self._add_fsm_and_user(update)
 
         message = ("/start - starts the chat\n"
-                   "/text - shows a text to discuss\n"
+                   "/text - shows current text to discuss\n"
                    "/factoid_question - bot asks factoid question about text\n"
-                   "/help - shows this message.\n"
+                   "/help - shows this message\n"
+                   "/reset - reset (the same as /start)\n"
                    "\n"
                    "Version: {}".format(version))
         update.message.reply_text(message)
@@ -108,7 +119,7 @@ class DialogTracker:
 
         if fsm.is_init():
             update.message.reply_text(
-                "{}, please type /start to begin the journey.".format(username)
+                "{}, please type /start to begin the journey {}.".format(username, telegram.Emoji.MOUNTAIN_RAILWAY)
             )
             update.message.reply_text("Also, you can type /help to get help")
         elif fsm.is_asked():
@@ -119,9 +130,6 @@ class DialogTracker:
     def _button(self, bot, update):
         query = update.callback_query
 
-        bot.edit_message_text(text="Thank you, {}!".format(self._user_name(update)),
-                              chat_id=query.message.chat_id,
-                              message_id=query.message.message_id)
         self._users_fsm[update.effective_user.id].go_from_choices(query.data)
 
     def _add_fsm_and_user(self, update, hard=False):

@@ -3,6 +3,7 @@ import threading
 import telegram
 import random
 import subprocess
+import requests
 
 from fuzzywuzzy import fuzz
 from transitions.extensions import LockedMachine as Machine
@@ -17,7 +18,7 @@ class FSM:
       'correct_answer', 'incorrect_answer', 'bot_answering_question', 'bot_answering_replica',
       'bot_correct_answer', 'bot_incorrect_answer'
     ]
-    wait_messages = ["Why you're not speaking? Am I bother you?(",
+    wait_messages = ["Why you're not speaking? Am I bother you? {}".format(telegram.Emoji.FACE_WITH_COLD_SWEAT),
      "Please, speak with me.", "Why you're not typing anything?",
      "Please, speak with me. It gives me energy to live"]
 
@@ -27,8 +28,8 @@ class FSM:
     ANSWER_CORRECT = 'ac'
     ANSWER_INCORRECT = 'ai'
 
-    WAIT_TIME = 10
-    WAIT_TOO_LONG = 15
+    WAIT_TIME = 45
+    WAIT_TOO_LONG = 120
 
     def __init__(self, bot, user=None, chat=None, text=None):
         self.machine = Machine(model=self, states=FSM.states, initial='init')
@@ -96,7 +97,7 @@ class FSM:
             if self.is_asked():
                 self.long_wait()
         self._get_factoid_question()
-        self._bot.send_message(self._chat.id, self._factoid_qas[self._qa_ind]['question'])
+        self._bot.send_message(self._chat.id, self._filter_seq2seq_output(self._factoid_qas[self._qa_ind]['question']))
 
         t = threading.Timer(FSM.WAIT_TOO_LONG, _too_long_waiting_if_user_inactive)
         t.start()
@@ -134,12 +135,11 @@ class FSM:
     def get_klass_of_user_message(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
-        self._bot.send_message(self._chat.id, ("I'm trying to classify your message"
-                                               " to give correct answer"))
+        self._bot.send_message(self._chat.id, ("Help me to understand the type of your sentence."))
         keyboard = [
-            [telegram.InlineKeyboardButton("Answer to my factoid question", callback_data=FSM.CLASSIFY_ANSWER),
-             telegram.InlineKeyboardButton("Factoid question to me", callback_data=FSM.CLASSIFY_QUESTION),
-             telegram.InlineKeyboardButton("Just chit-chatting", callback_data=FSM.CLASSIFY_REPLICA)]
+            [telegram.InlineKeyboardButton("Factoid question to me", callback_data=FSM.CLASSIFY_QUESTION),
+             telegram.InlineKeyboardButton("Chit-chat", callback_data=FSM.CLASSIFY_REPLICA),
+             telegram.InlineKeyboardButton("Answer to my factoid question", callback_data=FSM.CLASSIFY_ANSWER)]
         ]
 
         reply_markup = telegram.InlineKeyboardMarkup(keyboard)
@@ -156,7 +156,7 @@ class FSM:
             self.check_user_answer()
         elif clf_type == FSM.CLASSIFY_ANSWER and not self._question_asked:
             self._send_message(("I did not ask you a question. Then why do you think"
-                " it has the answer type? My last sentence is a rhetorical question :)"))
+                " it has the answer type? My last sentence is a rhetorical question 😋"))
             self.return_to_start()
         elif clf_type == FSM.CLASSIFY_QUESTION:
             self.answer_to_user_question()
@@ -170,20 +170,20 @@ class FSM:
         sim = fuzz.ratio(true_answer, self._last_user_message)
         if sim == 100:
             self._send_message("And its right answer!!!")
-            self._send_message("You're very smart")
-            self._send_message("Try to ask me something else or I will ask you")
+            self._send_message("You're very smart {}".format(telegram.Emoji.GRADUATION_CAP))
+            self._send_message("Try to ask me something else or relax and wait my question 🌈")
 
             self.correct_user_answer()
             self.return_to_start()
         elif sim >= 90:
             self._send_message("I think you mean: \"{}\"".format(true_answer))
             self._send_message("If you really mean what I think then my congratulations!")
-            self._send_message("Try to ask me something else or I will ask you")
+            self._send_message("Try to ask me something else or relax and wait my question 🌈")
 
             self.correct_user_answer()
             self.return_to_start()
         else:
-            self._send_message("Ehh its incorrect(")
+            self._send_message("Ehh its incorrect {}".format(telegram.Emoji.DISAPPOINTED_BUT_RELIEVED_FACE))
             self._send_message("Hint: first 3 answer letters {}".format(true_answer[:3]))
             self._send_message("{}, try again, please!".format(self._user.first_name))
 
@@ -198,7 +198,7 @@ class FSM:
              telegram.InlineKeyboardButton("Incorrect", callback_data=FSM.ANSWER_INCORRECT)]
         ]
         reply_markup = telegram.InlineKeyboardMarkup(keyboard)
-        answer = self._get_answer_to_factoid_question()
+        answer = self._filter_seq2seq_output(self._get_answer_to_factoid_question())
         self._send_message("My answer is: \"{}\"".format(answer), reply_markup=reply_markup)
 
     def _get_answer_to_factoid_question(self):
@@ -216,8 +216,14 @@ class FSM:
         self.return_to_wait()
 
     def _get_seq2seq_reply(self):
-        context = " ".join(self._seq2seq_context)
-        return random.sample(context.split(' '), 1)[0]
+        words = [word for word in self._last_user_message.split(' ')]
+        context = " ".join(words[-29:])
+        r = requests.get(
+            'http://tf_chatbot:5000/reply',
+            params={'context': context}
+        )
+        res = self._filter_seq2seq_output(r.json()[0]['dec_inp'])
+        return res
 
     def go_from_choices(self, query_data):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
@@ -234,11 +240,11 @@ class FSM:
 
         if clf_type == FSM.ANSWER_CORRECT:
             self.answer_to_user_question_correct()
-            self._send_message("Hooray! I'm smart!")
+            self._send_message("Hooray! I'm smart {}".format(telegram.Emoji.SMILING_FACE_WITH_SUNGLASSES))
         elif clf_type == FSM.ANSWER_INCORRECT:
             self.answer_to_user_question_incorrect()
-            self._send_message(("Maybe 42? Sorry, I don't know the answer :(\n"
-                                "I hope my master will make me smarter."))
+            self._send_message(("Maybe 42? Sorry, I don't know the answer 🤔\n"
+                                " I hope my master will make me smarter."))
         self.return_to_start()
 
     def _send_message(self, text, reply_markup=None):
@@ -259,3 +265,7 @@ class FSM:
             self._seq2seq_context = []
         [t.cancel() for t in self._threads]
 
+    def _filter_seq2seq_output(self, s):
+        s = "{}{}".format(s[0].upper(), s[1:])
+        s = "'".join([w.strip() for w in s.split("'")])
+        return s

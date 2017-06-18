@@ -1,0 +1,10 @@
+sftp-config.json
+*.pyc
+works/*
+!works/lyrics_ptt
+go_train
+*.yaml
+ssl/*
+lib/old
+lib/foward_only
+lib/foward_only_tensor
