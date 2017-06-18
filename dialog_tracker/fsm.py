@@ -2,6 +2,7 @@ import logging
 import threading
 import telegram
 import random
+import subprocess
 
 from fuzzywuzzy import fuzz
 from transitions.extensions import LockedMachine as Machine
@@ -68,10 +69,12 @@ class FSM:
         self._seq2seq_context = []
 
     def _init_factoid_qas(self):
-        self._factoid_qas = [
-          {'question': 'How are you?', 'answer': "I'm fine, thanks."},
-          {'question': 'What is the day of week today?', 'answer': 'Sunday'}
-        ]
+        self._send_message("Please wait 1-2 minutes, I'm initializing... {}".format(telegram.Emoji.ROLLER_COASTER))
+        out = subprocess.check_output(["from_question_generation/get_qnas", self._text])
+        questions = [line.split('\t') for line in str(out, "utf-8").split("\n")]
+        logger.info(questions)
+        self._factoid_qas = [{'question': e[0], 'answer': e[1]} for e in questions if len(e) == 3]
+
         self._question_asked = False
         self._qa_ind = -1
 
