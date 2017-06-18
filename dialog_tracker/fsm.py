@@ -7,6 +7,9 @@ import requests
 
 from fuzzywuzzy import fuzz
 from transitions.extensions import LockedMachine as Machine
+from telegram.utils import request
+
+
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,7 +34,7 @@ class FSM:
     WAIT_TIME = 45
     WAIT_TOO_LONG = 120
 
-    def __init__(self, bot, user=None, chat=None, text=None):
+    def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=FSM.states, initial='init')
 
         self.machine.add_transition('start', 'init', 'started', after='wait_for_user_typing')
@@ -62,7 +65,8 @@ class FSM:
         self._bot = bot
         self._user = user
         self._chat = chat
-        self._text = text
+        self._text_and_qa = text_and_qa
+        self._text = self._text_and_qa['text']
         self._too_long_waiting_cntr = 0
         self.__last_user_message = None
         self._threads = []
@@ -70,11 +74,7 @@ class FSM:
         self._seq2seq_context = []
 
     def _init_factoid_qas(self):
-        self._send_message("Please wait 1-2 minutes, I'm initializing... {}".format(telegram.Emoji.ROLLER_COASTER))
-        out = subprocess.check_output(["from_question_generation/get_qnas", self._text])
-        questions = [line.split('\t') for line in str(out, "utf-8").split("\n")]
-        logger.info(questions)
-        self._factoid_qas = [{'question': e[0], 'answer': e[1]} for e in questions if len(e) == 3]
+        self._factoid_qas = self._text_and_qa['qas']
 
         self._question_asked = False
         self._qa_ind = -1

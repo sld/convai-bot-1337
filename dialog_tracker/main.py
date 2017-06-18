@@ -1,5 +1,6 @@
 import logging
 import telegram
+import json
 
 from random import sample
 from time import sleep
@@ -13,28 +14,12 @@ logger = logging.getLogger(__name__)
 version = "1 (18.06.2017)"
 
 
-class StoriesHandler:
-    def __init__(self, filename="data/train-v1.1.json"):
-        with open(filename) as f:
-            dataset = json.load(f)
-        self.stories = [par["context"] for text in dataset["data"] for par in text["paragraphs"]]
+def load_text_and_qas(filename):
+    with open(filename, 'r') as f:
+        return json.load(f)
 
 
 class DialogTracker:
-    text =  ("The Notre Dame football team has a long history, first beginning"
-         " when the Michigan Wolverines football team brought football to Notre Dame in"
-         " 1887 and played against a group of students. In the long history since then,"
-         " 13 Fighting Irish teams have won consensus national championships (although"
-         " the university only claims 11), along with another nine teams being named"
-         " national champion by at least one source. Additionally, the program has the"
-         " most members in the College Football Hall of Fame, is tied with Ohio State"
-         " University with the most Heisman Trophies won, and have the highest winning"
-         " percentage in NCAA history. With the long history, Notre Dame has"
-         " accumulated many rivals, and its annual game against USC for the Jeweled"
-         " Shillelagh has been named by some as one of the most important in college"
-         " football and is often called the greatest intersectional rivalry in college"
-         " football in the country.")
-
     def __init__(self):
         token = "381793449:AAEogsUmzwqgBQiIz6OmdzWOY6iU_GwATeI"
         self._bot = telegram.Bot(token)
@@ -54,6 +39,8 @@ class DialogTracker:
 
         self._users_fsm = {}
         self._users = {}
+        self._text_and_qas = load_text_and_qas('data/squad-25-qas.json')
+        self._text_ind = 0
 
     def start(self):
         self._updater.start_polling()
@@ -85,13 +72,15 @@ class DialogTracker:
                    " Type /help to get some more information.")
         update.message.reply_text(message)
 
-        update.message.reply_text("The text: \"{}\"".format(DialogTracker.text))
+        update.message.reply_text("The text: \"{}\"".format(self._text()))
         update.message.reply_text("Also you can the get text by using /text command")
         update.message.reply_text("Ask me something or I'll do it in 45 seconds")
 
         self._add_fsm_and_user(update, True)
         fsm = self._users_fsm[update.effective_user.id]
         fsm.start()
+
+        self._text_ind += 1
 
     def _help_cmd(self, bot, update):
         self._add_fsm_and_user(update)
@@ -108,7 +97,7 @@ class DialogTracker:
     def _text_cmd(self, bot, update):
         self._add_fsm_and_user(update)
 
-        update.message.reply_text("The text: \"{}\"".format(DialogTracker.text))
+        update.message.reply_text("The text: \"{}\"".format(self._text()))
 
     def _echo_cmd(self, bot, update):
         self._add_fsm_and_user(update)
@@ -134,7 +123,7 @@ class DialogTracker:
 
     def _add_fsm_and_user(self, update, hard=False):
         if hard or update.effective_user.id not in self._users_fsm:
-            fsm = FSM(self._bot, update.effective_chat, update.effective_user, DialogTracker.text)
+            fsm = FSM(self._bot, update.effective_chat, update.effective_user, self._text_and_qa())
             self._users_fsm[update.effective_user.id] = fsm
             self._users[update.effective_user.id] = update.effective_user
 
@@ -144,8 +133,13 @@ class DialogTracker:
     def _user_name(self, update):
         return self._users[update.effective_user.id].first_name
 
+    def _text(self):
+        return self._text_and_qa()['text']
+
+    def _text_and_qa(self):
+        return self._text_and_qas[self._text_ind % len(self._text_and_qas)]
+
 
 if __name__ == '__main__':
     dt = DialogTracker()
     dt.start()
-
