@@ -3,6 +3,7 @@ import threading
 import telegram
 import random
 
+from fuzzywuzzy import fuzz
 from transitions.extensions import LockedMachine as Machine
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -28,7 +29,7 @@ class FSM:
     WAIT_TIME = 10
     WAIT_TOO_LONG = 15
 
-    def __init__(self, bot, user=None, chat=None):
+    def __init__(self, bot, user=None, chat=None, text=None):
         self.machine = Machine(model=self, states=FSM.states, initial='init')
 
         self.machine.add_transition('start', 'init', 'started', after='wait_for_user_typing')
@@ -59,12 +60,22 @@ class FSM:
         self._bot = bot
         self._user = user
         self._chat = chat
+        self._text = text
         self._too_long_waiting_cntr = 0
         self.__last_user_message = None
         self._threads = []
+        self._init_factoid_qas()
+
+    def _init_factoid_qas(self):
+        self._factoid_qas = [
+          {'question': 'How are you?', 'answer': "I'm fine, thanks."},
+          {'question': 'What is the day of week today?', 'answer': 'Sunday'}
+        ]
+        self._question_asked = False
+        self._qa_ind = -1
 
     def wait_for_user_typing(self):
-        self._cancel_timer_threads()
+        self._cancel_timer_threads(reset_question=False)
 
         def _ask_question_if_user_inactive():
             if self.is_started():
@@ -75,20 +86,24 @@ class FSM:
         self._threads.append(t)
 
     def ask_question_to_user(self):
-        self._cancel_timer_threads()
+        self._cancel_timer_threads(reset_question=False)
 
         def _too_long_waiting_if_user_inactive():
             if self.is_asked():
                 self.long_wait()
-        self._bot.send_message(self._chat.id, "I'm working!! And asking you a question...")
-        self._bot.send_message(self._chat.id, "How are you?")
+        self._get_factoid_question()
+        self._bot.send_message(self._chat.id, self._factoid_qas[self._qa_ind]['question'])
 
         t = threading.Timer(FSM.WAIT_TOO_LONG, _too_long_waiting_if_user_inactive)
         t.start()
         self._threads.append(t)
 
+    def _get_factoid_question(self):
+        self._question_asked = True
+        self._qa_ind = (self._qa_ind + 1) % len(self._factoid_qas)
+
     def say_user_about_long_waiting(self):
-        self._cancel_timer_threads(presereve_cntr=True)
+        self._cancel_timer_threads(reset_question=False, presereve_cntr=True)
 
         def _too_long_waiting_if_user_inactive():
             if self.is_waiting() and self._too_long_waiting_cntr < 4:
@@ -113,13 +128,13 @@ class FSM:
                                                "Type /start to replay."))
 
     def get_klass_of_user_message(self):
-        self._cancel_timer_threads()
+        self._cancel_timer_threads(reset_question=False)
 
         self._bot.send_message(self._chat.id, ("I'm trying to classify your message"
                                                " to give correct answer"))
         keyboard = [
-            [telegram.InlineKeyboardButton("Answer to my question", callback_data=FSM.CLASSIFY_ANSWER),
-             telegram.InlineKeyboardButton("Question to me", callback_data=FSM.CLASSIFY_QUESTION),
+            [telegram.InlineKeyboardButton("Answer to my factoid question", callback_data=FSM.CLASSIFY_ANSWER),
+             telegram.InlineKeyboardButton("Factoid question to me", callback_data=FSM.CLASSIFY_QUESTION),
              telegram.InlineKeyboardButton("Just chit-chatting", callback_data=FSM.CLASSIFY_REPLICA)]
         ]
 
@@ -131,27 +146,41 @@ class FSM:
         )
 
     def _classify_user_utterance(self, clf_type):
-        self._cancel_timer_threads()
+        self._cancel_timer_threads(reset_question=False)
 
-        if clf_type == FSM.CLASSIFY_ANSWER:
+        if clf_type == FSM.CLASSIFY_ANSWER and self._question_asked:
             self.check_user_answer()
+        elif clf_type == FSM.CLASSIFY_ANSWER and not self._question_asked:
+            self._send_message(("I did not ask you a question. Then why do you think"
+                " it has the answer type? My last sentence is a rhetorical question :)"))
+            self.return_to_start()
         elif clf_type == FSM.CLASSIFY_QUESTION:
             self.answer_to_user_question()
         elif clf_type == FSM.CLASSIFY_REPLICA:
             self.answer_to_user_replica()
 
     def checking_user_answer(self):
-        self._cancel_timer_threads()
+        self._cancel_timer_threads(reset_question=False)
 
-        if self._last_user_message == 'Right answer':
+        true_answer = self._factoid_qas[self._qa_ind]['answer']
+        sim = fuzz.ratio(true_answer, self._last_user_message)
+        if sim == 100:
             self._send_message("And its right answer!!!")
             self._send_message("You're very smart")
             self._send_message("Try to ask me something else or I will ask you")
 
             self.correct_user_answer()
             self.return_to_start()
+        elif sim >= 90:
+            self._send_message("I think you mean: \"{}\"".format(true_answer))
+            self._send_message("If you really mean what I think then my congratulations!")
+            self._send_message("Try to ask me something else or I will ask you")
+
+            self.correct_user_answer()
+            self.return_to_start()
         else:
             self._send_message("Ehh its incorrect(")
+            self._send_message("Hint: first 3 answer letters {}".format(true_answer[:3]))
             self._send_message("{}, try again, please!".format(self._user.first_name))
 
             self.incorrect_user_answer()
@@ -165,11 +194,12 @@ class FSM:
              telegram.InlineKeyboardButton("Incorrect", callback_data=FSM.ANSWER_INCORRECT)]
         ]
         reply_markup = telegram.InlineKeyboardMarkup(keyboard)
-        if self._last_user_message == 'How are you?':
-            ans = "I'm fine thanks!"
-        else:
-            ans = "43"
-        self._send_message("My answer is: \"{}\"".format(ans), reply_markup=reply_markup)
+        answer = self._get_answer_to_factoid_question()
+        self._send_message("My answer is: \"{}\"".format(answer), reply_markup=reply_markup)
+
+    def _get_answer_to_factoid_question(self):
+        res = self._last_user_message + self._text
+        return random.sample(res.split(' '), 1)[0]
 
     def answer_to_user_replica_(self):
         self._cancel_timer_threads()
@@ -177,7 +207,7 @@ class FSM:
         self.return_to_wait()
 
     def go_from_choices(self, query_data):
-        self._cancel_timer_threads()
+        self._cancel_timer_threads(reset_question=False)
 
         assert query_data[0] in ['c', 'a']
 
@@ -205,8 +235,11 @@ class FSM:
             reply_markup=reply_markup
         )
 
-    def _cancel_timer_threads(self, presereve_cntr=False):
+    def _cancel_timer_threads(self, presereve_cntr=False, reset_question=True):
         if not presereve_cntr:
             self._too_long_waiting_cntr = 0
+
+        if reset_question:
+            self._question_asked = False
         [t.cancel() for t in self._threads]
 

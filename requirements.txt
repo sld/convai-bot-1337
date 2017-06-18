@@ -1,2 +1,3 @@
 transitions==0.5.3
 python-telegram-bot==6.0.3
+fuzzywuzzy[speedup]==0.15.0

@@ -107,7 +107,7 @@ class DialogTracker:
 
     def _add_fsm_and_user(self, update, hard=False):
         if hard or update.effective_user.id not in self._users_fsm:
-            fsm = FSM(self._bot, update.effective_chat, update.effective_user)
+            fsm = FSM(self._bot, update.effective_chat, update.effective_user, DialogTracker.text)
             self._users_fsm[update.effective_user.id] = fsm
             self._users[update.effective_user.id] = update.effective_user
 
