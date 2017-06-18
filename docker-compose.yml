@@ -39,6 +39,8 @@ services:
     build:
       context: './tf_chatbot_seq2seq_antilm/'
     image: 'tf_chatbot:0.1.0'
+    working_dir: '/src'
+    command: python3 app.py --mode test --model_name example --vocab_size 100000 --size 256 --antilm 0.25
     ports:
       - '5000:5000'
     restart: 'always'

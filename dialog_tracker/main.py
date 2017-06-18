@@ -119,6 +119,8 @@ class DialogTracker:
     def _button(self, bot, update):
         query = update.callback_query
 
+        bot.edit_message_text(text="...", chat_id=query.message.chat_id, message_id=query.message.message_id)
+
         self._users_fsm[update.effective_user.id].go_from_choices(query.data)
 
     def _add_fsm_and_user(self, update, hard=False):
