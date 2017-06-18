@@ -4,6 +4,7 @@ services:
     image: 'sld3/corenlp:3.6.0'
     ports:
       - '9000:9000'
+    restart: 'always'
     deploy:
       resources:
         limits:
@@ -18,6 +19,7 @@ services:
       - corenlp
     ports:
       - '5556:5556'
+    restart: 'always'
     deploy:
       resources:
         limits:
@@ -27,6 +29,7 @@ services:
     image: 'sld3/bi-att-flow:0.1.0'
     ports:
       - '1995:1995'
+    restart: 'always'
     deploy:
       resources:
         limits:
@@ -38,6 +41,7 @@ services:
     image: 'tf_chatbot:0.1.0'
     ports:
       - '5000:5000'
+    restart: 'always'
     volumes:
       - ./tf_chatbot_seq2seq_antilm:/src
     deploy:
@@ -49,6 +53,7 @@ services:
     build:
       context: './dialog_tracker/'
     image: 'dialog_tracker:1'
+    restart: 'always'
     volumes:
       - ./dialog_tracker:/src
     depends_on:
