@@ -76,7 +76,8 @@ class DialogTracker:
         update.message.reply_text(message)
 
         update.message.reply_text("The text: \"{}\"".format(DialogTracker.text))
-        update.message.reply_text("Also you can the get text by typing /text command")
+        update.message.reply_text("Also you can the get text by using /text command")
+        update.message.reply_text("Ask me something or I'll do it in 45 seconds")
 
         self._add_fsm_and_user(update, True)
         fsm = self._users_fsm[update.effective_user.id]

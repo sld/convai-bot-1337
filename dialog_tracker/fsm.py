@@ -202,8 +202,10 @@ class FSM:
         self._send_message("My answer is: \"{}\"".format(answer), reply_markup=reply_markup)
 
     def _get_answer_to_factoid_question(self):
-        res = self._last_user_message + self._text
-        return random.sample(res.split(' '), 1)[0]
+        out = subprocess.check_output(
+            ["python3", "from_factoid_question_answerer/get_answer.py",
+             "--paragraph", self._text, "--question", self._last_user_message])
+        return str(out, "utf-8").strip()
 
     def answer_to_user_replica_(self):
         self._cancel_timer_threads(reset_seq2seq_context=False)
