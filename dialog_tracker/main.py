@@ -63,6 +63,8 @@ class DialogTracker:
             fsm.ask_question()
 
     def _start_cmd(self, bot, update):
+        self._text_ind += 1
+
         message = 'Hi {}!'.format(update.effective_user.first_name)
         update.message.reply_text(message)
 
@@ -79,8 +81,6 @@ class DialogTracker:
         self._add_fsm_and_user(update, True)
         fsm = self._users_fsm[update.effective_user.id]
         fsm.start()
-
-        self._text_ind += 1
 
     def _help_cmd(self, bot, update):
         self._add_fsm_and_user(update)
