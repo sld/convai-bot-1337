@@ -142,6 +142,7 @@ class DialogTracker:
             self._users_fsm[update.effective_user.id] = fsm
             self._users[update.effective_user.id] = update.effective_user
         elif update.effective_user.id in self._users_fsm and hard:
+            self._users_fsm[update.effective_user.id].set_text_and_qa(self._text_and_qa())
             self._users_fsm[update.effective_user.id].clear_all()
 
     def _error(self, bot, update, error):

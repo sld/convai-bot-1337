@@ -67,18 +67,22 @@ class FSM:
         self._user = user
         self._chat = chat
         self._text_and_qa = text_and_qa
-        self._text = self._text_and_qa['text']
         self._too_long_waiting_cntr = 0
         self.__last_user_message = None
         self._threads = []
-        self._init_factoid_qas()
+        self._init_factoid_qas_and_text()
         self._seq2seq_context = []
 
-    def _init_factoid_qas(self):
+    def _init_factoid_qas_and_text(self):
         self._factoid_qas = self._text_and_qa['qas']
+        self._text = self._text_and_qa['text']
 
         self._question_asked = False
         self._qa_ind = -1
+
+    def set_text_and_qa(self, text_and_qa):
+        self._text_and_qa = text_and_qa
+        self._init_factoid_qas_and_text()
 
     def wait_for_user_typing(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
