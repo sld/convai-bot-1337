@@ -5,12 +5,21 @@ import json
 from random import sample
 from time import sleep
 from fsm import FSM
+from sys import argv
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+logger_bot = logging.getLogger('bot')
+bot_file_handler = logging.FileHandler("bot.log")
+bot_log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+bot_file_handler.setFormatter(bot_log_formatter)
+if not logger_bot.handlers:
+    logger_bot.addHandler(bot_file_handler)
+
 version = "1 (18.06.2017)"
 
 
@@ -20,8 +29,7 @@ def load_text_and_qas(filename):
 
 
 class DialogTracker:
-    def __init__(self):
-        token = "381793449:AAEogsUmzwqgBQiIz6OmdzWOY6iU_GwATeI"
+    def __init__(self, token):
         self._bot = telegram.Bot(token)
         self._updater = Updater(bot=self._bot)
 
@@ -48,6 +56,8 @@ class DialogTracker:
         self._updater.idle()
 
     def _reset_cmd(self, bot, update):
+        self._log_user('_reset_cmd', update)
+
         self._add_fsm_and_user(update)
         fsm = self._users_fsm[update.effective_user.id]
         fsm.return_to_init()
@@ -59,6 +69,8 @@ class DialogTracker:
 
 
     def _factoid_question_cmd(self, bot, update):
+        self._log_user('_factoid_question_cmd', update)
+
         self._add_fsm_and_user(update)
 
         username = self._user_name(update)
@@ -75,7 +87,11 @@ class DialogTracker:
             fsm.ask_question()
 
     def _start_cmd(self, bot, update):
+        self._log_user('_start_cmd', update)
+
         self._text_ind += 1
+
+        logger_bot.info("BOT[_start_cmd] text_id: {}".format(self._text_ind))
 
         message = 'Hi {}!'.format(update.effective_user.first_name)
         update.message.reply_text(message)
@@ -95,6 +111,8 @@ class DialogTracker:
         fsm.start()
 
     def _help_cmd(self, bot, update):
+        self._log_user('_help_cmd', update)
+
         self._add_fsm_and_user(update)
 
         message = ("/start - starts the chat\n"
@@ -108,11 +126,15 @@ class DialogTracker:
         update.message.reply_text(message)
 
     def _text_cmd(self, bot, update):
+        self._log_user('_text_cmd', update)
+
         self._add_fsm_and_user(update)
 
         update.message.reply_text("The text: \"{}\"".format(self._text()))
 
     def _echo_cmd(self, bot, update):
+        self._log_user('_echo_cmd', update)
+
         self._add_fsm_and_user(update)
 
         username = self._user_name(update)
@@ -131,10 +153,13 @@ class DialogTracker:
 
     def _button(self, bot, update):
         query = update.callback_query
-
+        logger_bot.info("USER[_button]: {}".format(query.data))
         bot.edit_message_text(text="...", chat_id=query.message.chat_id, message_id=query.message.message_id)
 
         self._users_fsm[update.effective_user.id].go_from_choices(query.data)
+
+    def _log_user(self, cmd, update):
+        logger_bot.info("USER[{}]: {}".format(cmd, update.message.text))
 
     def _add_fsm_and_user(self, update, hard=False):
         if update.effective_user.id not in self._users_fsm:
@@ -159,5 +184,8 @@ class DialogTracker:
 
 
 if __name__ == '__main__':
-    dt = DialogTracker()
+    # token_test = "447990426:AAH4OvsshJi_YVEKDeoosaRlQYhbzNfwtDU"
+    # dt = DialogTracker(token_test)
+    token_prod = "381793449:AAEogsUmzwqgBQiIz6OmdzWOY6iU_GwATeI"
+    dt = DialogTracker(token_prod)
     dt.start()

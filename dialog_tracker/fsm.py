@@ -14,6 +14,13 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+logger_bot = logging.getLogger('bot')
+bot_file_handler = logging.FileHandler("bot.log")
+bot_log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+bot_file_handler.setFormatter(bot_log_formatter)
+if not logger_bot.handlers:
+    logger_bot.addHandler(bot_file_handler)
+
 
 class FSM:
     states = [
@@ -102,7 +109,7 @@ class FSM:
             if self.is_asked():
                 self.long_wait()
         self._get_factoid_question()
-        self._bot.send_message(self._chat.id, self._filter_seq2seq_output(self._factoid_qas[self._qa_ind]['question']))
+        self._send_message(self._filter_seq2seq_output(self._factoid_qas[self._qa_ind]['question']))
 
         t = threading.Timer(FSM.WAIT_TOO_LONG, _too_long_waiting_if_user_inactive)
         t.start()
@@ -117,7 +124,7 @@ class FSM:
 
         def _too_long_waiting_if_user_inactive():
             if self.is_waiting() and self._too_long_waiting_cntr < 4:
-                self._bot.send_message(self._chat.id, random.sample(FSM.wait_messages, 1)[0])
+                self._send_message(self._chat.id, random.sample(FSM.wait_messages, 1)[0])
                 self.too_long_wait()
             elif self.is_waiting() and self._too_long_waiting_cntr > 3:
                 self.user_off()
@@ -134,13 +141,13 @@ class FSM:
     def propose_conversation_ending(self):
         self._cancel_timer_threads()
 
-        self._bot.send_message(self._chat.id, ("Seems you went to the real life."
-                                               "Type /start to replay."))
+        self._send_message(("Seems you went to the real life."
+                            "Type /start to replay."))
 
     def get_klass_of_user_message(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
-        self._bot.send_message(self._chat.id, ("Help me to understand the type of your sentence."))
+        self._send_message("Help me to understand the type of your sentence.")
         keyboard = [
             [telegram.InlineKeyboardButton("Factoid question to me", callback_data=FSM.CLASSIFY_QUESTION),
              telegram.InlineKeyboardButton("Chit-chat", callback_data=FSM.CLASSIFY_REPLICA),
@@ -148,11 +155,7 @@ class FSM:
         ]
 
         reply_markup = telegram.InlineKeyboardMarkup(keyboard)
-        self._bot.send_message(
-            chat_id=self._chat.id,
-            text="Your last sentence \"{}\" was?".format(self._last_user_message),
-            reply_markup=reply_markup
-        )
+        self._send_message("Your last sentence \"{}\" was?".format(self._last_user_message), reply_markup=reply_markup)
 
     def _classify_user_utterance(self, clf_type):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
@@ -253,6 +256,8 @@ class FSM:
         self.return_to_start()
 
     def _send_message(self, text, reply_markup=None):
+        logger_bot.info("BOT[_send_message]: {}".format(text))
+
         self._bot.send_message(
             chat_id=self._chat.id,
             text=text,
