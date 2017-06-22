@@ -124,7 +124,7 @@ class FSM:
 
         def _too_long_waiting_if_user_inactive():
             if self.is_waiting() and self._too_long_waiting_cntr < 4:
-                self._send_message(self._chat.id, random.sample(FSM.wait_messages, 1)[0])
+                self._send_message(random.sample(FSM.wait_messages, 1)[0])
                 self.too_long_wait()
             elif self.is_waiting() and self._too_long_waiting_cntr > 3:
                 self.user_off()
