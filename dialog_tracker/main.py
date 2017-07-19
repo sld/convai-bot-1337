@@ -20,7 +20,7 @@ bot_file_handler.setFormatter(bot_log_formatter)
 if not logger_bot.handlers:
     logger_bot.addHandler(bot_file_handler)
 
-version = "1 (18.06.2017)"
+version = "2 (19.07.2017)"
 
 
 def load_text_and_qas(filename):
@@ -147,7 +147,7 @@ class DialogTracker:
             )
             update.message.reply_text("Also, you can type /help to get help")
         elif fsm.is_asked():
-            fsm.classify()
+            fsm.check_user_answer_on_asked()
         else:
             fsm.classify()
 
@@ -184,8 +184,9 @@ class DialogTracker:
 
 
 if __name__ == '__main__':
-    # token_test = "447990426:AAH4OvsshJi_YVEKDeoosaRlQYhbzNfwtDU"
-    # dt = DialogTracker(token_test)
-    token_prod = "381793449:AAEogsUmzwqgBQiIz6OmdzWOY6iU_GwATeI"
-    dt = DialogTracker(token_prod)
+    if argv[1] == 'test':
+        token = "447990426:AAH4OvsshJi_YVEKDeoosaRlQYhbzNfwtDU"
+    else:
+        token = "381793449:AAEogsUmzwqgBQiIz6OmdzWOY6iU_GwATeI"
+    dt = DialogTracker(token)
     dt.start()

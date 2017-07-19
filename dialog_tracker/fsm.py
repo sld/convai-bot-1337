@@ -52,6 +52,7 @@ class FSM:
         self.machine.add_transition('classify', 'waiting', 'classifying', after='get_klass_of_user_message')
         self.machine.add_transition('classify', 'classifying', 'classifying', after='get_klass_of_user_message')
 
+        self.machine.add_transition('check_user_answer_on_asked', 'asked', 'checking_answer', after='checking_user_answer')
         self.machine.add_transition('check_user_answer', 'classifying', 'checking_answer', after='checking_user_answer')
         self.machine.add_transition('correct_user_answer', 'checking_answer', 'correct_answer')
         self.machine.add_transition('incorrect_user_answer', 'checking_answer', 'incorrect_answer')
@@ -144,18 +145,24 @@ class FSM:
         self._send_message(("Seems you went to the real life."
                             "Type /start to replay."))
 
+    def _classify(self, text):
+        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/factoid_question_vs_all.bin -".format(text)
+        ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = ps.communicate()[0]
+        res = str(output, "utf-8").strip()
+        logger.info(res)
+        if self.is_asked():
+            return FSM.CLASSIFY_ANSWER
+        if res == '__label__0':
+            return FSM.CLASSIFY_REPLICA
+        elif res == '__label__1':
+            return FSM.CLASSIFY_QUESTION
+
     def get_klass_of_user_message(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
-        self._send_message("Help me to understand the type of your sentence.")
-        keyboard = [
-            [telegram.InlineKeyboardButton("Factoid question to me", callback_data=FSM.CLASSIFY_QUESTION),
-             telegram.InlineKeyboardButton("Chit-chat", callback_data=FSM.CLASSIFY_REPLICA),
-             telegram.InlineKeyboardButton("Answer to my factoid question", callback_data=FSM.CLASSIFY_ANSWER)]
-        ]
-
-        reply_markup = telegram.InlineKeyboardMarkup(keyboard)
-        self._send_message("Your last sentence \"{}\" was?".format(self._last_user_message), reply_markup=reply_markup)
+        klass = self._classify(self._last_user_message)
+        self._classify_user_utterance(klass)
 
     def _classify_user_utterance(self, clf_type):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
