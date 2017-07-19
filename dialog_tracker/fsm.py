@@ -208,13 +208,8 @@ class FSM:
     def answer_to_user_question_(self):
         self._cancel_timer_threads()
 
-        keyboard = [
-            [telegram.InlineKeyboardButton("Correct", callback_data=FSM.ANSWER_CORRECT),
-             telegram.InlineKeyboardButton("Incorrect", callback_data=FSM.ANSWER_INCORRECT)]
-        ]
-        reply_markup = telegram.InlineKeyboardMarkup(keyboard)
         answer = self._filter_seq2seq_output(self._get_answer_to_factoid_question())
-        self._send_message("My answer is: \"{}\"".format(answer), reply_markup=reply_markup)
+        self._send_message("My answer is: \"{}\"".format(answer))
 
     def _get_answer_to_factoid_question(self):
         out = subprocess.check_output(
