@@ -14,7 +14,9 @@ services:
     image: 'sld3/opennmt:latest'
     volumes:
       - './question_generation/data/:/root/data'
-    command: bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0 -port 5556  -model /root/data/model.t7  -beam_size 12"
+    command: >
+      bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0
+      -port 5556  -model /root/data/model.t7 -beam_size 12 -replace_unk true"
     depends_on:
       - corenlp
     ports:
@@ -25,14 +27,17 @@ services:
         limits:
           memory: 512M
 
-  # opennmt_chitchat:
-  #   image: 'sld3/opennmt:latest'
-  #   volumes:
-  #     - './opennmt_chitchat/data/:/root/data'
-  #   command: bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0 -port 5556  -model /root/data/8_40000_model_checkpoint.t7 -beam_size 12"
-  #   ports:
-  #     - '5557:5556'
-  #   restart: 'no'
+  opennmtchitchat:
+    image: 'sld3/opennmt:latest'
+    volumes:
+      - './opennmt_chitchat/data/:/root/data'
+    command: >
+      bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0
+      -port 5556  -model /root/data/CPU_8_40000_model_checkpoint.t7
+      -beam_size 12 -replace_unk true"
+    ports:
+      - '5557:5556'
+    restart: 'always'
 
   bidaf:
     image: 'sld3/bi-att-flow:0.1.0'
@@ -72,6 +77,7 @@ services:
       - corenlp
       - opennmt
       - tf_chatbot
+      - opennmtchitchat
     deploy:
       resources:
         limits:
