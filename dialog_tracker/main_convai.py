@@ -35,47 +35,48 @@ class DialogTracker:
     def __init__(self, token):
         self._bot = convai_api.ConvApiBot()
 
-        self._users_fsm = {}
+        self._chat_fsm = {}
         self._users = {}
         self._text_and_qas = load_text_and_qas('data/squad-25-qas.json')
         self._text_ind = 0
 
     def start(self):
         while True:
-            res = requests.get(os.path.join(convai_api.BOT_URL, 'getUpdates'))
-            if res.status_code != 200:
-                logger.waring(res.text)
+            try:
+                res = requests.get(os.path.join(convai_api.BOT_URL, 'getUpdates'))
+                if res.status_code != 200:
+                    logger.warn(res.text)
 
-            # update.message.text (_log_user)
-            # update.effective_chat (_chat.id), update.effective_user (_user.first_name, id)
-            for m in res.json():
-                logger.info(m)
-                update = convai_api.ConvUpdate(m)
-                if m['message']['text'].startswith('/start ') or m['message']['text'] == '/begin' or m['message']['text'].startswith('/test '):
-                    self._log_user('_start_or_begin_or_test_cmd', update)
-                    self._add_fsm_and_user(update)
-                    fsm = self._users_fsm[update.effective_user.id]
+                for m in res.json():
+                    logger.info(m)
+                    update = convai_api.ConvUpdate(m)
+                    if m['message']['text'].startswith('/start ') or m['message']['text'] == '/begin':
+                        self._log_user('_start_or_begin_or_test_cmd', update)
+                        self._add_fsm_and_user(update)
+                        fsm = self._chat_fsm[update.effective_chat.id]
 
-                    fsm.return_to_start()
-                    fsm.ask_question()
-                elif m['message']['text'] == '/end':
-                    self._log_user('_end_cmd', update)
-                    self._add_fsm_and_user(update)
-                    fsm = self._users_fsm[update.effective_user.id]
-                    fsm.return_to_init()
-                else:
-                    self._log_user('_echo_cmd', update)
-
-                    self._add_fsm_and_user(update)
-
-                    username = self._user_name(update)
-                    fsm = self._users_fsm[update.effective_user.id]
-                    fsm._last_user_message = update.message.text
-
-                    if fsm.is_asked():
-                        fsm.check_user_answer_on_asked()
+                        fsm.return_to_start()
+                        fsm.ask_question()
+                    elif m['message']['text'] == '/end':
+                        self._log_user('_end_cmd', update)
+                        self._add_fsm_and_user(update)
+                        fsm = self._chat_fsm[update.effective_chat.id]
+                        fsm.return_to_init()
                     else:
-                        fsm.classify()
+                        self._log_user('_echo_cmd', update)
+
+                        self._add_fsm_and_user(update)
+
+                        fsm = self._chat_fsm[update.effective_chat.id]
+                        fsm._last_user_message = update.message.text
+
+                        if fsm.is_asked():
+                            fsm.check_user_answer_on_asked()
+                        else:
+                            fsm.classify()
+            except Exception as e:
+                logger.exception(str(e))
+            sleep(1)
 
 
     def _reset_cmd(self, bot, update):
@@ -185,13 +186,13 @@ class DialogTracker:
         logger_bot.info("USER[{}]: {}".format(cmd, update.message.text))
 
     def _add_fsm_and_user(self, update, hard=False):
-        if update.effective_user.id not in self._users_fsm:
-            fsm = FSM(self._bot, update.effective_chat, update.effective_user, self._text_and_qa())
-            self._users_fsm[update.effective_user.id] = fsm
+        if update.effective_chat.id not in self._chat_fsm:
+            fsm = FSM(self._bot, update.effective_user, update.effective_chat, self._text_and_qa())
+            self._chat_fsm[update.effective_chat.id] = fsm
             self._users[update.effective_user.id] = update.effective_user
-        elif update.effective_user.id in self._users_fsm and hard:
-            self._users_fsm[update.effective_user.id].set_text_and_qa(self._text_and_qa())
-            self._users_fsm[update.effective_user.id].clear_all()
+        elif update.effective_user.id in self._chat_fsm and hard:
+            self._chat_fsm[update.effective_chat.id].set_text_and_qa(self._text_and_qa())
+            self._chat_fsm[update.effective_chat.id].clear_all()
 
     def _error(self, bot, update, error):
         logger.warn('Update "%s" caused error "%s"' % (update, error))

@@ -12,7 +12,7 @@ BOT_URL = "https://convaibot.herokuapp.com/F0690A4D-B999-46F0-AD14-C65C13F09C40"
 
 class ConvApiBot:
     def send_message(self, chat_id, text, reply_markup=None):
-        data = {'text': text, 'evaluation': 10}
+        data = {'text': text, 'evaluation': 0}
         message = {'chat_id': chat_id, 'text': json.dumps(data)}
 
         res = requests.post(
@@ -21,7 +21,7 @@ class ConvApiBot:
             headers={'Content-Type': 'application/json'}
         )
         if res.status_code != 200:
-            logger.warning(res.text)
+            logger.warn(res.text)
 
 
 class ConvUpdate:
