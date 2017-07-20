@@ -192,7 +192,7 @@ class FSM:
             self.correct_user_answer()
             self.return_to_start()
         else:
-            self._send_message("Ehh its incorrect. Hint: first 3 answer letters {} ".format(true_answer[:3]))
+            self._send_message("Ehh its incorrect. Hint: first 3 answer letters is \"{}\" ".format(true_answer[:3]))
             self.incorrect_user_answer()
             self.return_to_wait()
 
