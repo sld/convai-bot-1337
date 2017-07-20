@@ -184,37 +184,23 @@ class FSM:
         true_answer = self._factoid_qas[self._qa_ind]['answer']
         sim = fuzz.ratio(true_answer, self._last_user_message)
         if sim == 100:
-            self._send_message("And its right answer!!!")
-            self._send_message("You're very smart {}".format(telegram.Emoji.GRADUATION_CAP))
-            self._send_message("Try to ask me something else or relax and wait my question 🌈")
-
+            self._send_message("And its right answer!!! You're very smart. Try to ask me something else or relax and wait my question 🌈")
             self.correct_user_answer()
             self.return_to_start()
         elif sim >= 90:
-            self._send_message("I think you mean: \"{}\"".format(true_answer))
-            self._send_message("If you really mean what I think then my congratulations!")
-            self._send_message("Try to ask me something else or relax and wait my question 🌈")
-
+            self._send_message("I think you mean: \"{}\". If you really mean what I think then my congratulations! Try to ask me something else or relax and wait my question 🌈".format(true_answer))
             self.correct_user_answer()
             self.return_to_start()
         else:
-            self._send_message("Ehh its incorrect {}".format(telegram.Emoji.DISAPPOINTED_BUT_RELIEVED_FACE))
-            self._send_message("Hint: first 3 answer letters {}".format(true_answer[:3]))
-            self._send_message("{}, try again, please!".format(self._user.first_name))
-
+            self._send_message("Ehh its incorrect. Hint: first 3 answer letters {} ".format(true_answer[:3]))
             self.incorrect_user_answer()
             self.return_to_wait()
 
     def answer_to_user_question_(self):
         self._cancel_timer_threads()
 
-        keyboard = [
-            [telegram.InlineKeyboardButton("Correct", callback_data=FSM.ANSWER_CORRECT),
-             telegram.InlineKeyboardButton("Incorrect", callback_data=FSM.ANSWER_INCORRECT)]
-        ]
-        reply_markup = telegram.InlineKeyboardMarkup(keyboard)
         answer = self._filter_seq2seq_output(self._get_answer_to_factoid_question())
-        self._send_message("My answer is: \"{}\"".format(answer), reply_markup=reply_markup)
+        self._send_message("My answer is: \"{}\"".format(answer))
 
     def _get_answer_to_factoid_question(self):
         out = subprocess.check_output(
@@ -225,10 +211,23 @@ class FSM:
     def answer_to_user_replica_(self):
         self._cancel_timer_threads(reset_seq2seq_context=False)
         self._seq2seq_context.append(self._last_user_message)
-        bots_answer = self._get_seq2seq_reply()
+        tf_bots_answer = self._get_seq2seq_reply()
+        # tf_bots_answer = '_UNK'
+        if '_UNK' in tf_bots_answer:
+            bots_answer = self._get_opennmt_chitchat_reply()
+        else:
+            bots_answer = tf_bots_answer
         self._seq2seq_context.append(bots_answer)
         self._send_message(bots_answer)
         self.return_to_wait()
+
+    def _get_opennmt_chitchat_reply(self):
+        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py".format(self._last_user_message)
+        ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = ps.communicate()[0]
+        res = str(output, "utf-8").strip()
+        logger.info(res)
+        return res.split('\t')[1]
 
     def _get_seq2seq_reply(self):
         words = [word for word in self._last_user_message.split(' ')]
