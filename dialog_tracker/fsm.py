@@ -79,7 +79,7 @@ class FSM:
         self.__last_user_message = None
         self._threads = []
         self._init_factoid_qas_and_text()
-        self._seq2seq_context = []
+        self._dialog_context = []
 
     def _init_factoid_qas_and_text(self):
         self._factoid_qas = self._text_and_qa['qas']
@@ -210,23 +210,30 @@ class FSM:
 
     def answer_to_user_replica_(self):
         self._cancel_timer_threads(reset_seq2seq_context=False)
-        self._seq2seq_context.append(self._last_user_message)
-        tf_bots_answer = self._get_seq2seq_reply()
-        # tf_bots_answer = '_UNK'
+        # tf_bots_answer = self._get_seq2seq_reply()
+        tf_bots_answer = '_UNK'
         if '_UNK' in tf_bots_answer:
             bots_answer = self._get_opennmt_chitchat_reply()
         else:
             bots_answer = tf_bots_answer
-        self._seq2seq_context.append(bots_answer)
         self._send_message(bots_answer)
         self.return_to_wait()
 
+    def _get_last_bot_reply(self):
+        if len(self._dialog_context):
+            return self._dialog_context[-1][1]
+        return ""
+
     def _get_opennmt_chitchat_reply(self):
-        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py".format(self._last_user_message)
+        # feed_context = "{} {}".format(self._get_last_bot_reply(), self._last_user_message)
+        feed_context = self._last_user_message
+
+        logger.info("Send to opennmt chitchat: {}".format(feed_context))
+        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py".format(feed_context)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
-        logger.info(res)
+        logger.info("Got from opennmt chitchat: {}".format(res))
         return res.split('\t')[1]
 
     def _get_seq2seq_reply(self):
@@ -270,6 +277,8 @@ class FSM:
             reply_markup=reply_markup
         )
 
+        self._dialog_context.append((self._last_user_message, text))
+
     def _cancel_timer_threads(self, presereve_cntr=False, reset_question=True, reset_seq2seq_context=True):
         if not presereve_cntr:
             self._too_long_waiting_cntr = 0
@@ -277,8 +286,6 @@ class FSM:
         if reset_question:
             self._question_asked = False
 
-        if reset_seq2seq_context:
-            self._seq2seq_context = []
         [t.cancel() for t in self._threads]
 
     def _filter_seq2seq_output(self, s):

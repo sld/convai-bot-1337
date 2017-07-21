@@ -15,5 +15,6 @@ RUN git clone https://github.com/facebookresearch/fastText.git /fasttext && cd /
   && git checkout 8f036268097c76a284ee98e63d9a17e2feffe715
 
 RUN cd /fasttext && make
+RUN python -c "import nltk; nltk.download('punkt'); nltk.download('perluniprops'); nltk.download('nonbreaking_prefixes')"
 
 CMD python main.py
