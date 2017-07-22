@@ -6,6 +6,7 @@ import subprocess
 import requests
 
 from fuzzywuzzy import fuzz
+from from_opennmt_chitchat.get_reply import normalize
 from transitions.extensions import LockedMachine as Machine
 from telegram.utils import request
 
@@ -35,6 +36,7 @@ class FSM:
     CLASSIFY_ANSWER = 'ca'
     CLASSIFY_QUESTION = 'cq'
     CLASSIFY_REPLICA = 'cr'
+    CLASSIFY_FB = 'cf'
     ANSWER_CORRECT = 'ac'
     ANSWER_INCORRECT = 'ai'
 
@@ -66,6 +68,7 @@ class FSM:
         self.machine.add_transition('answer_to_user_question_incorrect', 'bot_answering_question', 'bot_incorrect_answer')
 
         self.machine.add_transition('answer_to_user_replica', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_')
+        self.machine.add_transition('answer_to_user_replica_with_fb', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_fb_')
 
         self.machine.add_transition('long_wait', 'asked', 'waiting', after='say_user_about_long_waiting')
         self.machine.add_transition('too_long_wait', 'waiting', 'waiting', after='say_user_about_long_waiting')
@@ -146,7 +149,8 @@ class FSM:
                             "Type /start to replay."))
 
     def _classify(self, text):
-        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/factoid_question_vs_all.bin -".format(text)
+        text = normalize(text)
+        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/fact_vs_fb_vs_os.bin -".format(text)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
@@ -157,6 +161,8 @@ class FSM:
             return FSM.CLASSIFY_REPLICA
         elif res == '__label__1':
             return FSM.CLASSIFY_QUESTION
+        elif res == '__label__2':
+            return FSM.CLASSIFY_FB
 
     def get_klass_of_user_message(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
@@ -177,6 +183,8 @@ class FSM:
             self.answer_to_user_question()
         elif clf_type == FSM.CLASSIFY_REPLICA:
             self.answer_to_user_replica()
+        elif clf_type == FSM.CLASSIFY_FB:
+            self.answer_to_user_replica_with_fb()
 
     def checking_user_answer(self):
         self._cancel_timer_threads(reset_question=False)
@@ -210,12 +218,13 @@ class FSM:
 
     def answer_to_user_replica_(self):
         self._cancel_timer_threads(reset_seq2seq_context=False)
-        # tf_bots_answer = self._get_seq2seq_reply()
-        tf_bots_answer = '_UNK'
-        if '_UNK' in tf_bots_answer:
-            bots_answer = self._get_opennmt_chitchat_reply()
-        else:
-            bots_answer = tf_bots_answer
+        bots_answer = self._get_opennmt_chitchat_reply()
+        self._send_message(bots_answer)
+        self.return_to_wait()
+
+    def answer_to_user_replica_with_fb_(self):
+        self._cancel_timer_threads(reset_seq2seq_context=False)
+        bots_answer = self._get_opennmt_fb_reply()
         self._send_message(bots_answer)
         self.return_to_wait()
 
@@ -229,11 +238,23 @@ class FSM:
         feed_context = self._last_user_message
 
         logger.info("Send to opennmt chitchat: {}".format(feed_context))
-        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py".format(feed_context)
+        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py tcp://opennmtchitchat:5556".format(feed_context)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
         logger.info("Got from opennmt chitchat: {}".format(res))
+        return res.split('\t')[1]
+
+    def _get_opennmt_fb_reply(self):
+        # feed_context = "{} {}".format(self._get_last_bot_reply(), self._last_user_message)
+        feed_context = "{} _EOP_ {}".format(self._text, self._last_user_message)
+
+        logger.info("Send to fb chitchat: {}".format(feed_context))
+        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py tcp://opennmtfb:5556".format(feed_context)
+        ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = ps.communicate()[0]
+        res = str(output, "utf-8").strip()
+        logger.info("Got from fb chitchat: {}".format(res))
         return res.split('\t')[1]
 
     def _get_seq2seq_reply(self):

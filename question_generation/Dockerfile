@@ -22,7 +22,7 @@ ENV LUA_CPATH='/root/torch/install/lib/?.so;'$LUA_CPATH
 
 RUN luarocks install tds
 RUN git clone https://github.com/OpenNMT/OpenNMT /root/opennmt && cd /root/opennmt && \
-  git checkout f3d502221badd67ea4da95942398e4e9383a7079
+  git checkout 611e6367660487212d56efb760f0da353df7b45d
 
 EXPOSE 5556
 

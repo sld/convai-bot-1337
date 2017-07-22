@@ -6,6 +6,7 @@ import re
 from nltk import word_tokenize
 from nltk.tokenize.moses import MosesDetokenizer
 from signal import signal, SIGPIPE, SIG_DFL
+from sys import argv
 
 
 # nltk.download('punkt')
@@ -13,10 +14,10 @@ from signal import signal, SIGPIPE, SIG_DFL
 
 
 class ConnectionHandler:
-    def __init__(self):
+    def __init__(self, url):
         signal(SIGPIPE, SIG_DFL)
         self.sock = zmq.Context().socket(zmq.REQ)
-        self.sock.connect("tcp://opennmtchitchat:5556")
+        self.sock.connect(url)
 
     def __call__(self, data):
         self.sock.send_string(json.dumps(data))
@@ -58,12 +59,12 @@ def untokenize(words):
     return step6.strip()
 
 
-
 if __name__ == '__main__':
     fin = sys.stdin
     data = [{"src": normalize(line)} for line in fin]
 
-    connect = ConnectionHandler()
+    url = argv[1]
+    connect = ConnectionHandler(url)
     received = connect(data)
 
     for dst, score, src in sorted(received, key=lambda x: x[2], reverse=True):

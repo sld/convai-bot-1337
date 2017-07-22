@@ -39,6 +39,18 @@ services:
       - '5557:5556'
     restart: 'always'
 
+  opennmtfb:
+    image: 'sld3/opennmt:611e636'
+    volumes:
+      - './fbnews_chitchat/data/:/root/data'
+    command: >
+      bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0
+      -port 5556  -model /root/data/CPU_8_x_model_news.t7
+      -beam_size 12 -replace_unk true"
+    ports:
+      - '5558:5556'
+    restart: 'always'
+
   bidaf:
     image: 'sld3/bi-att-flow:0.1.0'
     ports:
