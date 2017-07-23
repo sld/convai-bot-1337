@@ -79,7 +79,7 @@ class FSM:
         self._chat = chat
         self._text_and_qa = text_and_qa
         self._too_long_waiting_cntr = 0
-        self.__last_user_message = None
+        self._last_user_message = None
         self._threads = []
         self._init_factoid_qas_and_text()
         self._dialog_context = []
