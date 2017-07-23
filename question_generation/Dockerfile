@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y \
   libzmq3-dev
 
 RUN git clone https://github.com/torch/distro.git /root/torch --recursive && cd /root/torch && \
-  git checkout 9e2f875d0ee3d82e16d87b5abc0d64c92b50fd10
+  git checkout 5beb83c46e91abd273c192a3fa782b62217072a6
 
 RUN cd /root/torch && bash install-deps && ./install.sh
 
