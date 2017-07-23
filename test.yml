@@ -1,4 +1,20 @@
 version: "3"
 services:
   dialog_tracker:
-    command: python main.py test
+    build:
+      context: './dialog_tracker/'
+    image: 'dialog_tracker:1'
+    command: python main.py prod
+    restart: 'always'
+    volumes:
+      - ./dialog_tracker:/src
+    depends_on:
+      - corenlp
+      - opennmt
+      - opennmtchitchat
+      - opennmtfb
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+

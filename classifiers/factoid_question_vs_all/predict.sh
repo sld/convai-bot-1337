@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-../fastText/fasttext predict model.bin predict.txt
+../fastText/fasttext predict model.ftz predict.txt

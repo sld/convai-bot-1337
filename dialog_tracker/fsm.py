@@ -1,6 +1,7 @@
 import logging
 import threading
 import telegram
+import itertools
 import random
 import subprocess
 import requests
@@ -23,15 +24,26 @@ if not logger_bot.handlers:
     logger_bot.addHandler(bot_file_handler)
 
 
+def combinate_and_return_answer(arr):
+        messages_product = list(itertools.product(*arr))
+        msg_arr = random.sample(messages_product, 1)[0]
+        msg = " ".join(msg_arr)
+        return msg
+
+
 class FSM:
     states = [
       'init', 'started', 'asked', 'waiting', 'classifying', 'ending', 'checking_answer',
       'correct_answer', 'incorrect_answer', 'bot_answering_question', 'bot_answering_replica',
       'bot_correct_answer', 'bot_incorrect_answer'
     ]
-    wait_messages = ["Why you're not speaking? Am I bother you? {}".format(telegram.Emoji.FACE_WITH_COLD_SWEAT),
-     "Please, speak with me.", "Why you're not typing anything?",
-     "Please, speak with me. It gives me energy to live"]
+    wait_messages = [
+        "What do you feel about the text?", "Do you like this text?",
+        "Do you know familiar texts?", "Can you write similar text?",
+        "Do you like to chat with me?", "Are you a scientist?",
+        "What do you think about ConvAI competition?",
+        "Do you like to be an assessor?" "What is your job?"
+    ]
 
     CLASSIFY_ANSWER = 'ca'
     CLASSIFY_QUESTION = 'cq'
@@ -40,7 +52,7 @@ class FSM:
     ANSWER_CORRECT = 'ac'
     ANSWER_INCORRECT = 'ai'
 
-    WAIT_TIME = 45
+    WAIT_TIME = 30
     WAIT_TOO_LONG = 120
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
@@ -58,6 +70,7 @@ class FSM:
         self.machine.add_transition('check_user_answer', 'classifying', 'checking_answer', after='checking_user_answer')
         self.machine.add_transition('correct_user_answer', 'checking_answer', 'correct_answer')
         self.machine.add_transition('incorrect_user_answer', 'checking_answer', 'incorrect_answer')
+        self.machine.add_transition('return_to_asked', 'incorrect_answer', 'asked')
         self.machine.add_transition('return_to_start', '*', 'started', after='wait_for_user_typing')
         self.machine.add_transition('return_to_wait', '*', 'waiting', after='say_user_about_long_waiting')
         self.machine.add_transition('return_to_init', '*', 'init', after='clear_all')
@@ -83,6 +96,7 @@ class FSM:
         self._threads = []
         self._init_factoid_qas_and_text()
         self._dialog_context = []
+        self._is_first_incorrect = True
 
     def _init_factoid_qas_and_text(self):
         self._factoid_qas = self._text_and_qa['qas']
@@ -192,7 +206,7 @@ class FSM:
         true_answer = self._factoid_qas[self._qa_ind]['answer']
         sim = fuzz.ratio(true_answer, self._last_user_message)
         if sim == 100:
-            self._send_message("And its right answer!!! You're very smart. Try to ask me something else or relax and wait my question 🌈")
+            self._send_message("And its right answer! You're very smart. Try to ask me something else or relax and wait my question 🌈")
             self.correct_user_answer()
             self.return_to_start()
         elif sim >= 90:
@@ -200,9 +214,16 @@ class FSM:
             self.correct_user_answer()
             self.return_to_start()
         else:
-            self._send_message("Ehh its incorrect. Hint: first 3 answer letters is \"{}\" ".format(true_answer[:3]))
             self.incorrect_user_answer()
-            self.return_to_wait()
+            if self._is_first_incorrect is True:
+                msg = "Hint: first 3 answer letters is \"{}\". Try again, please!".format(true_answer[:3])
+                self._send_message(msg)
+                self.return_to_asked()
+                self._is_first_incorrect = False
+            else:
+                self._send_message('Still incorrect :( Lets speak about something else...')
+                self.return_to_wait()
+                self._is_first_incorrect = True
 
     def answer_to_user_question_(self):
         self._cancel_timer_threads()

@@ -8,7 +8,7 @@ import subprocess
 
 from random import sample
 from time import sleep
-from fsm import FSM
+from fsm import FSM, combinate_and_return_answer
 from sys import argv
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
@@ -24,22 +24,48 @@ bot_file_handler.setFormatter(bot_log_formatter)
 if not logger_bot.handlers:
     logger_bot.addHandler(bot_file_handler)
 
-version = "5 (23.07.2017)"
+version = "6 (23.07.2017)"
 
 
 class DialogTracker:
-    def __init__(self):
-        self._bot = convai_api.ConvApiBot()
+    def __init__(self, bot_url):
+        self._bot = convai_api.ConvApiBot(bot_url)
+        self._bot_url = bot_url
 
         self._chat_fsm = {}
         self._users = {}
         self._text = 'God'
         self._factoid_qas = []
 
+
+    def greet_user(self, chat_id):
+        hello_messages_1 = ['Hi', 'Hello', 'Hello my friend', 'Hi my friend',
+                          'Greetings', 'Hello, my friend', 'Hi, my friend']
+
+        hello_messages_2 = ['It is a pleasure to speak with you',
+                            'I hope you will enjoy this conversation',
+                            'Hope this chat will go well']
+
+        hello_messages_3 = ['Wait a second for my factoid question',
+                            "I will ask you a question in a second, please wait"]
+
+        greet_messages = [hello_messages_1, ['.', '!', ''], hello_messages_2, ['.'],
+                          hello_messages_3, ['.', '!', ''] ]
+        msg = combinate_and_return_answer(greet_messages)
+        self._bot.send_message(chat_id=chat_id, text=msg)
+
+    def bye_user(self, chat_id):
+        bye_msg_1 = ['Thanks', 'Thx', 'Thank you']
+        bye_msg_2 = ['for your time']
+        bye_msg_3 = ['Bye', 'Goodbye', 'See you later']
+        bye_msgs = [bye_msg_1, bye_msg_2, ['.', '!'], bye_msg_3, ['.', '!', '']]
+        msg = combinate_and_return_answer(bye_msgs)
+        self._bot.send_message(chat_id=chat_id, text=msg)
+
     def start(self):
         while True:
             try:
-                res = requests.get(os.path.join(convai_api.BOT_URL, 'getUpdates'))
+                res = requests.get(os.path.join(self._bot_url, 'getUpdates'), timeout=5)
                 if res.status_code != 200:
                     logger.warn(res.text)
 
@@ -48,6 +74,9 @@ class DialogTracker:
                     update = convai_api.ConvUpdate(m)
                     if m['message']['text'].startswith('/start '):
                         self._log_user('_start_or_begin_or_test_cmd', update)
+
+                        self.greet_user(update.effective_chat.id)
+
                         self._text = m['message']['text'][len('/start '):]
                         self._get_qas()
                         self._add_fsm_and_user(update, True)
@@ -110,5 +139,6 @@ class DialogTracker:
 
 
 if __name__ == '__main__':
-    dt = DialogTracker()
+    bot_url = argv[1]
+    dt = DialogTracker(bot_url)
     dt.start()
