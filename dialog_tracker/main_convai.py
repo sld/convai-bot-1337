@@ -33,6 +33,8 @@ class DialogTracker:
 
         self._chat_fsm = {}
         self._users = {}
+        self._text = 'God'
+        self._factoid_qas = []
 
     def start(self):
         while True:
@@ -50,7 +52,7 @@ class DialogTracker:
                         self._get_qas()
                         self._add_fsm_and_user(update)
                         fsm = self._chat_fsm[update.effective_chat.id]
-
+                        fsm.return_to_init()
                         fsm.return_to_start()
                         fsm.ask_question()
                     elif m['message']['text'] == '/end':
@@ -79,7 +81,7 @@ class DialogTracker:
                             fsm.classify()
             except Exception as e:
                 logger.exception(str(e))
-            sleep(0.05)
+            sleep(0.01)
 
     def _log_user(self, cmd, update):
         logger_bot.info("USER[{}]: {}".format(cmd, update.message.text))
