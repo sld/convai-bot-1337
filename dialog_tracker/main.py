@@ -20,7 +20,7 @@ bot_file_handler.setFormatter(bot_log_formatter)
 if not logger_bot.handlers:
     logger_bot.addHandler(bot_file_handler)
 
-version = "2 (19.07.2017)"
+version = "5 (23.07.2017)"
 
 
 def load_text_and_qas(filename):

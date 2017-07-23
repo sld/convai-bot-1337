@@ -24,7 +24,7 @@ bot_file_handler.setFormatter(bot_log_formatter)
 if not logger_bot.handlers:
     logger_bot.addHandler(bot_file_handler)
 
-version = "4 (20.07.2017)"
+version = "5 (23.07.2017)"
 
 
 class DialogTracker:
@@ -58,6 +58,10 @@ class DialogTracker:
                         self._add_fsm_and_user(update)
                         fsm = self._chat_fsm[update.effective_chat.id]
                         fsm.return_to_init()
+                    elif m['message']['text'].startswith('version'):
+                        self._add_fsm_and_user(update)
+                        fsm = self._chat_fsm[update.effective_chat.id]
+                        fsm._send_message("Version is {}".format(version))
                     else:
                         self._log_user('_echo_cmd', update)
 
@@ -65,6 +69,9 @@ class DialogTracker:
 
                         fsm = self._chat_fsm[update.effective_chat.id]
                         fsm._last_user_message = update.message.text
+                        if not fsm._text:
+                            fsm._send_message('Text is not given. Please try to type /end and /test to reset the state and get text.')
+                            continue
 
                         if fsm.is_asked():
                             fsm.check_user_answer_on_asked()

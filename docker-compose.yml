@@ -61,22 +61,6 @@ services:
         limits:
           memory: 512M
 
-  # tf_chatbot:
-  #   build:
-  #     context: './tf_chatbot_seq2seq_antilm/'
-  #   image: 'tf_chatbot:0.1.0'
-  #   working_dir: '/src'
-  #   command: python3 app.py --mode test --model_name example --vocab_size 100000 --size 256 --antilm 0.25
-  #   ports:
-  #     - '5000:5000'
-  #   restart: 'always'
-  #   volumes:
-  #     - ./tf_chatbot_seq2seq_antilm:/src
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 2048M
-
   dialog_tracker:
     build:
       context: './dialog_tracker/'

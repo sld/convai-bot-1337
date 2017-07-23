@@ -297,7 +297,8 @@ class FSM:
             text=text,
             reply_markup=reply_markup
         )
-
+        if self._last_user_message is None:
+            self._last_user_message = ""
         self._dialog_context.append((self._last_user_message, text))
 
     def _cancel_timer_threads(self, presereve_cntr=False, reset_question=True, reset_seq2seq_context=True):

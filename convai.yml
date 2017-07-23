@@ -1,4 +1,19 @@
 version: "3"
 services:
-  dialog_tracker:
+  dialog_tracker_convai:
+    build:
+      context: './dialog_tracker/'
+    image: 'dialog_tracker:1'
     command: python main_convai.py test
+    restart: 'always'
+    volumes:
+      - ./dialog_tracker:/src
+    depends_on:
+      - corenlp
+      - opennmt
+      - opennmtchitchat
+      - opennmtfb
+    deploy:
+      resources:
+        limits:
+          memory: 512M
