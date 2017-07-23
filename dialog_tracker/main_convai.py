@@ -50,24 +50,29 @@ class DialogTracker:
                         self._log_user('_start_or_begin_or_test_cmd', update)
                         self._text = m['message']['text'][len('/start '):]
                         self._get_qas()
-                        self._add_fsm_and_user(update)
+                        self._add_fsm_and_user(update, True)
                         fsm = self._chat_fsm[update.effective_chat.id]
                         fsm.return_to_init()
                         fsm.return_to_start()
                         fsm.ask_question()
                     elif m['message']['text'] == '/end':
                         self._log_user('_end_cmd', update)
-                        self._add_fsm_and_user(update)
                         fsm = self._chat_fsm[update.effective_chat.id]
                         fsm.return_to_init()
                     elif m['message']['text'].startswith('version'):
+                        self._log_user('version', update)
                         self._add_fsm_and_user(update)
                         fsm = self._chat_fsm[update.effective_chat.id]
                         fsm._send_message("Version is {}".format(version))
+                    elif m['message']['text'].startswith('reset'):
+                        self._log_user('reset', update)
+                        self._add_fsm_and_user(update, True)
+                        fsm = self._chat_fsm[update.effective_chat.id]
+                        fsm.return_to_init()
+                        fsm.return_to_start()
+                        fsm._send_message("Hmm....")
                     else:
                         self._log_user('_echo_cmd', update)
-
-                        self._add_fsm_and_user(update)
 
                         fsm = self._chat_fsm[update.effective_chat.id]
                         fsm._last_user_message = update.message.text
