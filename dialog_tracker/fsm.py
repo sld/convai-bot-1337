@@ -150,7 +150,7 @@ class FSM:
 
     def _classify(self, text):
         text = normalize(text)
-        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/fact_vs_fb_vs_os.bin -".format(text)
+        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/model.ftz -".format(text)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
