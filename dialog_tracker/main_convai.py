@@ -79,7 +79,7 @@ class DialogTracker:
                             fsm.classify()
             except Exception as e:
                 logger.exception(str(e))
-            sleep(1)
+            sleep(0.05)
 
     def _log_user(self, cmd, update):
         logger_bot.info("USER[{}]: {}".format(cmd, update.message.text))

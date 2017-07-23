@@ -7,7 +7,7 @@ from uuid import uuid4
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
-BOT_URL = "https://ipavlov.mipt.ru/nipsrouter/F0690A4D-B999-46F0-AD14-C65C13F09C40"
+BOT_URL = "https://ipavlov.mipt.ru/nipsrouter-alt/F0690A4D-B999-46F0-AD14-C65C13F09C40"
 
 
 class ConvApiBot:
