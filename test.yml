@@ -12,7 +12,7 @@ services:
       - corenlp
       - opennmt
       - opennmtchitchat
-      - opennmtfb
+      - opennmtfbpost
     deploy:
       resources:
         limits:

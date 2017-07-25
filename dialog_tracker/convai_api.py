@@ -3,6 +3,7 @@ import logging
 import requests
 import os
 from uuid import uuid4
+from from_opennmt_chitchat.get_reply import normalize, detokenize
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -14,8 +15,10 @@ class ConvApiBot:
         self._bot_url = bot_url
 
     def send_message(self, chat_id, text, reply_markup=None):
+        text = detokenize(text)
         data = {'text': text, 'evaluation': 0}
         message = {'chat_id': chat_id, 'text': json.dumps(data)}
+        logger.info("ConvApiBot#send_message: {}".format(text))
 
         res = requests.post(
             os.path.join(self._bot_url, 'sendMessage'),

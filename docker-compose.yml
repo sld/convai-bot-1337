@@ -33,22 +33,22 @@ services:
       - './opennmt_chitchat/data/:/root/data'
     command: >
       bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0
-      -port 5556  -model /root/data/CPU_1_epoch_os_chitchat.t7
+      -port 5556  -model /root/data/CPU_epoch5_14.62.t7
       -beam_size 12 -replace_unk true"
     ports:
       - '5557:5556'
     restart: 'always'
 
-  opennmtfb:
-    image: 'sld3/opennmt:611e636'
+  opennmtfbpost:
+    image: 'sld3/opennmt:611e636_distro5beb83'
     volumes:
       - './fbnews_chitchat/data/:/root/data'
     command: >
       bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0
-      -port 5556  -model /root/data/CPU_epoch_3_checkpoint_fbnews.t7
+      -port 5556  -model /root/data/model_epoch18_93.23_release.t7
       -beam_size 12 -replace_unk true"
     ports:
-      - '5558:5556'
+      - '5559:5556'
     restart: 'always'
 
   bidaf:

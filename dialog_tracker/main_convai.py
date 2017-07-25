@@ -24,7 +24,7 @@ bot_file_handler.setFormatter(bot_log_formatter)
 if not logger_bot.handlers:
     logger_bot.addHandler(bot_file_handler)
 
-version = "6 (23.07.2017)"
+version = "7 (25.07.2017)"
 
 
 class DialogTracker:
@@ -49,7 +49,7 @@ class DialogTracker:
         hello_messages_3 = ['Wait a second for my factoid question',
                             "I will ask you a question in a second, please wait"]
 
-        greet_messages = [hello_messages_1, ['.', '!', ''], hello_messages_2, ['.'],
+        greet_messages = [hello_messages_1, ['.', '!'], hello_messages_2, ['.'],
                           hello_messages_3, ['.', '!', ''] ]
         msg = combinate_and_return_answer(greet_messages)
         self._bot.send_message(chat_id=chat_id, text=msg)

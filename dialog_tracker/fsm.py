@@ -7,7 +7,7 @@ import subprocess
 import requests
 
 from fuzzywuzzy import fuzz
-from from_opennmt_chitchat.get_reply import normalize
+from from_opennmt_chitchat.get_reply import normalize, detokenize
 from transitions.extensions import LockedMachine as Machine
 from telegram.utils import request
 
@@ -27,7 +27,7 @@ if not logger_bot.handlers:
 def combinate_and_return_answer(arr):
         messages_product = list(itertools.product(*arr))
         msg_arr = random.sample(messages_product, 1)[0]
-        msg = " ".join(msg_arr)
+        msg = detokenize(" ".join(msg_arr))
         return msg
 
 
@@ -42,7 +42,8 @@ class FSM:
         "Do you know familiar texts?", "Can you write similar text?",
         "Do you like to chat with me?", "Are you a scientist?",
         "What do you think about ConvAI competition?",
-        "Do you like to be an assessor?" "What is your job?"
+        "Do you like to be an assessor?",
+        "What is your job?"
     ]
 
     CLASSIFY_ANSWER = 'ca'
@@ -216,7 +217,7 @@ class FSM:
         else:
             self.incorrect_user_answer()
             if self._is_first_incorrect is True:
-                msg = "Hint: first 3 answer letters is \"{}\". Try again, please!".format(true_answer[:3])
+                msg = "You can do better. Hint: first 3 answer letters is \"{}\".".format(true_answer[:3])
                 self._send_message(msg)
                 self.return_to_asked()
                 self._is_first_incorrect = False
@@ -256,27 +257,56 @@ class FSM:
 
     def _get_opennmt_chitchat_reply(self):
         # feed_context = "{} {}".format(self._get_last_bot_reply(), self._last_user_message)
-        feed_context = self._last_user_message
+        sentence = self._last_user_message
+        sentence_with_context = None
+        if len(self._dialog_context) > 0:
+            sentence_with_context = " _EOS_ ".join([self._dialog_context[-1][1], self._last_user_message])
 
-        logger.info("Send to opennmt chitchat: {}".format(feed_context))
-        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py tcp://opennmtchitchat:5556".format(feed_context)
+        to_echo = sentence
+        if sentence_with_context:
+            to_echo = "{}\n{}".format(to_echo, sentence_with_context)
+
+        logger.info("Send to opennmt chitchat: {}".format(to_echo))
+        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py tcp://opennmtchitchat:5556".format(to_echo)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
         logger.info("Got from opennmt chitchat: {}".format(res))
-        return res.split('\t')[1]
+
+        return self._get_best_response(res)
+
+    def _get_best_response(self, tsv):
+        best_score = -100000
+        best_resp = ""
+        for line in tsv.split('\n'):
+            _, resp, score = line.split('\t')
+            score = float(score)
+            if score > best_score:
+                best_score = score
+                best_resp = resp
+        logger.info("Best response is {}".format(best_resp))
+        return best_resp
 
     def _get_opennmt_fb_reply(self):
         # feed_context = "{} {}".format(self._get_last_bot_reply(), self._last_user_message)
-        feed_context = "{} _EOP_ {}".format(self._text, self._last_user_message)
+        sentence = self._last_user_message
+        sentence_with_context = None
+        if len(self._dialog_context) > 0:
+            sentence_with_context = " ".join([self._dialog_context[-1][1], self._last_user_message])
 
-        logger.info("Send to fb chitchat: {}".format(feed_context))
-        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py tcp://opennmtfb:5556".format(feed_context)
+        text_with_sent = "{} {}".format(self._text, self._last_user_message)
+        to_echo = "{}\n{}".format(sentence, text_with_sent)
+        if sentence_with_context:
+            to_echo = "{}\n{}".format(to_echo, sentence_with_context)
+
+        logger.info("Send to fb chitchat: {}".format(to_echo))
+        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py tcp://opennmtfbpost:5556".format(to_echo)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
         logger.info("Got from fb chitchat: {}".format(res))
-        return res.split('\t')[1]
+
+        return self._get_best_response(res)
 
     def _get_seq2seq_reply(self):
         words = [word for word in self._last_user_message.split(' ')]
@@ -311,6 +341,7 @@ class FSM:
         self.return_to_start()
 
     def _send_message(self, text, reply_markup=None):
+        text = text.strip()
         logger_bot.info("BOT[_send_message]: {}".format(text))
 
         self._bot.send_message(
