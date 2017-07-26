@@ -5,6 +5,7 @@ import itertools
 import random
 import subprocess
 import requests
+import re
 
 from fuzzywuzzy import fuzz
 from from_opennmt_chitchat.get_reply import normalize, detokenize
@@ -207,22 +208,57 @@ class FSM:
         true_answer = self._factoid_qas[self._qa_ind]['answer']
         sim = fuzz.ratio(true_answer, self._last_user_message)
         if sim == 100:
-            self._send_message("And its right answer! You're very smart. Try to ask me something else or relax and wait my question 🌈")
+            msg1 = ['It is right', 'And its right answer', 'Right']
+            msg2 = ['!', ':)']
+            msg3 = ["You're smart.", ""]
+            msg4 = ["Ask me something or wait for my new question", "Ask me or wait my new question"]
+            msg5 = ["🌈", ":)", ""]
+            total_msg = [msg1, msg2, msg3, msg4, msg5]
+            msg = combinate_and_return_answer(total_msg)
+            self._send_message(msg)
             self.correct_user_answer()
             self.return_to_start()
-        elif sim >= 90:
-            self._send_message("I think you mean: \"{}\". If you really mean what I think then my congratulations! Try to ask me something else or relax and wait my question 🌈".format(true_answer))
+        elif sim >= 80:
+            msg1 = ["I think you mean: {}".format(true_answer), "Did you mean {}?".format(true_answer)]
+            msg2 = ["My congratulations", "If you really mean what I think then my congratulations", "Good job"]
+            msg3 = ["!", "."]
+            msg4 = ["Ask me something or wait for my new question", "Ask me or wait my new question"]
+            msg5 = ["🌈", ":)", ""]
+            total_msg = [msg1, msg2, msg3, msg4, msg5]
+            msg = combinate_and_return_answer(total_msg)
+            self._send_message(msg)
             self.correct_user_answer()
             self.return_to_start()
         else:
             self.incorrect_user_answer()
             if self._is_first_incorrect is True:
-                msg = "You can do better. Hint: first 3 answer letters is \"{}\".".format(true_answer[:3])
+                msg1 = ["You can do better", "Show me your best", "It is incorrect"]
+                msg2 = [".", "!", ":)"]
+                if len(true_answer) > 3:
+                    msg3 = ["Hint: first 3 letters is {}.".format(true_answer[:3])]
+                else:
+                    msg3 = ["Hint: first 2 letters is {}.".format(true_answer[:2])]
+                msg4 = ["Try again", "Try again, please"]
+                msg5 = ["", "!", "."]
+                total_msg = [msg1, msg2, msg3, msg4, msg5]
+
+                msg = combinate_and_return_answer(total_msg)
+
                 self._send_message(msg)
                 self.return_to_asked()
                 self._is_first_incorrect = False
             else:
-                self._send_message('Still incorrect :( Lets speak about something else...')
+                msg1 = ['Still incorrect', 'Incorrect', 'Maybe other time']
+                msg2 = ['.', ':(']
+                msg3 = ['I think that']
+                msg4 = ['correct answer', 'true answer', 'answer']
+                msg5 =  ['is: {}'.format(true_answer)]
+                msg6 = [":)", "", "."]
+                total_msg = [msg1, msg2, msg3, msg4, msg5, msg6]
+
+                msg = combinate_and_return_answer(total_msg)
+
+                self._send_message(msg)
                 self.return_to_wait()
                 self._is_first_incorrect = True
 
@@ -230,7 +266,15 @@ class FSM:
         self._cancel_timer_threads()
 
         answer = self._filter_seq2seq_output(self._get_answer_to_factoid_question())
-        self._send_message("My answer is: \"{}\"".format(answer))
+
+        msg1 = ["I think that", "It seems that", "I'd like to say that"]
+        msg2 = ["correct answer", "answer", "true answer"]
+        msg3 = ["is: {}".format(detokenize(normalize(answer))).lower()]
+        total_msg = [msg1, msg2, msg3]
+
+        msg = combinate_and_return_answer(total_msg)
+
+        self._send_message(msg)
 
     def _get_answer_to_factoid_question(self):
         out = subprocess.check_output(
@@ -281,11 +325,32 @@ class FSM:
         for line in tsv.split('\n'):
             _, resp, score = line.split('\t')
             score = float(score)
-            if score > best_score:
+            if score > best_score and not self._is_bad_resp(resp):
                 best_score = score
                 best_resp = resp
+
+        if self._is_bad_resp(best_resp):
+            best_resp = self._select_from_common_responses()
+
         logger.info("Best response is {}".format(best_resp))
         return best_resp
+
+    def _is_bad_resp(self, resp):
+        if '<unk>' in resp or re.match('\w', resp) is None:
+            return True
+        else:
+            return False
+
+    def _select_from_common_responses(self):
+        msg1 = ['Do you know what?', '', "I don't understand :(", '¯\_(ツ)_/¯']
+        msg2 = ["I can't answer", "Its beyond my possibilities"]
+        msg3 = [':(', '.', '!', ';(']
+        msg4 = ["Let's talk about", "I would like to talk about", "I would like to discuss"]
+        msg5 = ["movies", "politics", "news", "you", "myself", "cats", "..."]
+        msg6 = ['.', '', '!', ':)']
+        total_msg = [msg1, msg2, msg3, msg4, msg5, msg6]
+        msg = combinate_and_return_answer(total_msg)
+        return msg
 
     def _get_opennmt_fb_reply(self):
         # feed_context = "{} {}".format(self._get_last_bot_reply(), self._last_user_message)

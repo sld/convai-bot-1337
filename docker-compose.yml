@@ -34,7 +34,7 @@ services:
     command: >
       bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0
       -port 5556  -model /root/data/CPU_epoch5_14.62.t7
-      -beam_size 12 -replace_unk true"
+      -beam_size 12 -replace_unk false"
     ports:
       - '5557:5556'
     restart: 'always'
@@ -46,7 +46,7 @@ services:
     command: >
       bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0
       -port 5556  -model /root/data/model_epoch18_93.23_release.t7
-      -beam_size 12 -replace_unk true"
+      -beam_size 12 -replace_unk false"
     ports:
       - '5559:5556'
     restart: 'always'
