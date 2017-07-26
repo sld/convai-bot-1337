@@ -83,7 +83,8 @@ class DialogTracker:
                         fsm = self._chat_fsm[update.effective_chat.id]
                         fsm.return_to_init()
                         fsm.return_to_start()
-                        fsm.ask_question()
+                        if self._factoid_qas:
+                            fsm.ask_question()
                     elif m['message']['text'] == '/end':
                         self._log_user('_end_cmd', update)
                         fsm = self._chat_fsm[update.effective_chat.id]
