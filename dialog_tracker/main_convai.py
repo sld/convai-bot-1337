@@ -24,7 +24,7 @@ bot_file_handler.setFormatter(bot_log_formatter)
 if not logger_bot.handlers:
     logger_bot.addHandler(bot_file_handler)
 
-version = "7 (25.07.2017)"
+version = "8 (26.07.2017)"
 
 
 class DialogTracker:
