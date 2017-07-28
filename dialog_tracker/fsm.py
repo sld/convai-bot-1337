@@ -8,6 +8,7 @@ import requests
 import re
 
 from fuzzywuzzy import fuzz
+from nltk import word_tokenize
 from from_opennmt_chitchat.get_reply import normalize, detokenize
 from transitions.extensions import LockedMachine as Machine
 from telegram.utils import request
@@ -50,6 +51,8 @@ class FSM:
     CHITCHAT_URL = 'tcp://127.0.0.1:5557'
     FB_CHITCHAT_URL = 'tcp://127.0.0.1:5558'
 
+    # CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
+    # FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
 
     CLASSIFY_ANSWER = 'ca'
     CLASSIFY_QUESTION = 'cq'
@@ -73,6 +76,7 @@ class FSM:
         self.machine.add_transition('classify', 'asked', 'classifying', after='get_klass_of_user_message')
         self.machine.add_transition('classify', 'waiting', 'classifying', after='get_klass_of_user_message')
         self.machine.add_transition('classify', 'classifying', 'classifying', after='get_klass_of_user_message')
+        self.machine.add_transition('classify', 'checking_answer', 'classifying', after='get_klass_of_user_message')
 
         self.machine.add_transition('check_user_answer_on_asked', 'asked', 'checking_answer', after='checking_user_answer')
         self.machine.add_transition('check_user_answer', 'classifying', 'checking_answer', after='checking_user_answer')
@@ -170,15 +174,15 @@ class FSM:
         t.start()
         self._threads.append(t)
 
-    def wait_for_user_typing_convai(self):      
+    def wait_for_user_typing_convai(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
-        def _ask_question_if_user_inactive():      
+        def _ask_question_if_user_inactive():
             if self.is_started():
                 self.ask_question()
-                    
+
         t = threading.Timer(FSM.CONVAI_WAIT_QUESTION, _ask_question_if_user_inactive)
-        t.start()      
+        t.start()
         self._threads.append(t)
 
     def propose_conversation_ending(self):
@@ -225,10 +229,27 @@ class FSM:
         elif clf_type == FSM.CLASSIFY_FB:
             self.answer_to_user_replica_with_fb()
 
+    def _is_not_answer(self, reply):
+        reply = normalize(reply)
+        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/model_answer_detector.ftz -".format(reply)
+        ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = ps.communicate()[0]
+        res = str(output, "utf-8").strip()
+        logger.info("Answer classification result: {}; Input: {}".format(res, reply))
+        if res == '__label__3':
+            return False
+        else:
+            return True
+
     def checking_user_answer(self):
         self._cancel_timer_threads(reset_question=False)
 
         true_answer = self._factoid_qas[self._qa_ind]['answer']
+        tokens_count = len(word_tokenize(self._last_user_message))
+        if self._is_not_answer(self._last_user_message) and tokens_count > 2:
+            self.classify()
+            return
+
         # make user answer lowercased + remove ending chars
         true_answer_clean = true_answer.lower().rstrip(' .,;?!')
         user_answer_clean = self._last_user_message.lower().rstrip(' .,;?!')
