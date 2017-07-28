@@ -31,9 +31,9 @@ class ConvApiBot:
 
 class ConvUpdate:
     def __init__(self, message):
-        text = message['message']['text']
+        text = message['message']['text'].replace('"').(" ")
         self.effective_chat = ConvChat(message['message']['chat']['id'])
-        self.message = ConvMessage(message['message']['text'])
+        self.message = ConvMessage(text)
         self.effective_user = ConvUser()
 
 

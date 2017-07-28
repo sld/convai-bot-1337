@@ -332,6 +332,8 @@ class FSM:
         msg = combinate_and_return_answer(total_msg)
 
         self._send_message(msg)
+        self.return_to_wait()
+
 
     def _get_answer_to_factoid_question(self):
         out = subprocess.check_output(
@@ -473,6 +475,7 @@ class FSM:
         )
         if self._last_user_message is None:
             self._last_user_message = ""
+        text = text.replace('"', " ")
         self._dialog_context.append((self._last_user_message, text))
 
     def _cancel_timer_threads(self, presereve_cntr=False, reset_question=True, reset_seq2seq_context=True):
