@@ -109,11 +109,13 @@ class FSM:
         self._is_first_incorrect = True
 
     def _init_factoid_qas_and_text(self):
+        # list of all questions and answers
         self._factoid_qas = self._text_and_qa['qas']
         self._text = self._text_and_qa['text']
 
         self._question_asked = False
-        self._qa_ind = -1
+        # last asked factoid qas
+        self._last_factoid_qas = None
 
     def set_text_and_qa(self, text_and_qa):
         self._text_and_qa = text_and_qa
@@ -137,16 +139,24 @@ class FSM:
             if self.is_asked():
                 self.long_wait()
 
-        self._get_factoid_question()
-        self._send_message(self._filter_seq2seq_output(self._factoid_qas[self._qa_ind]['question']))
+        if self._get_factoid_question() is not None:
+            self._send_message(self._filter_seq2seq_output(self._last_factoid_qas['question']))
+        else:
+            self._send_message(random.sample(FSM.wait_messages, 1)[0])
+            self.return_to_wait()
 
         t = threading.Timer(FSM.WAIT_TOO_LONG, _too_long_waiting_if_user_inactive)
         t.start()
         self._threads.append(t)
 
     def _get_factoid_question(self):
+        if len(self._factoid_qas) == 0:
+            return None
+        # takes one question from list and removes it
         self._question_asked = True
-        self._qa_ind = (self._qa_ind + 1) % len(self._factoid_qas)
+        self._last_factoid_qas = self._factoid_qas[0]
+        self._factoid_qas = self._factoid_qas[1:]
+        return self._question_asked
 
     def say_user_about_long_waiting(self):
         self._cancel_timer_threads(reset_question=False, presereve_cntr=True, reset_seq2seq_context=False)
@@ -228,7 +238,7 @@ class FSM:
     def checking_user_answer(self):
         self._cancel_timer_threads(reset_question=False)
 
-        true_answer = self._factoid_qas[self._qa_ind]['answer']
+        true_answer = self._last_factoid_qas['answer']
         # make user answer lowercased + remove ending chars
         true_answer_clean = true_answer.lower().rstrip(' .,;?!')
         user_answer_clean = self._last_user_message.lower().rstrip(' .,;?!')
