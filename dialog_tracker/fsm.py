@@ -395,7 +395,7 @@ class FSM:
         return best_resp
 
     def _is_bad_resp(self, resp):
-        if '<unk>' in resp or re.match('\w', resp) is None:
+        if '<unk>' in resp or re.match('\w', resp) is None or ('youtube' in resp and 'www' in resp and 'watch' in resp):
             return True
         else:
             return False
