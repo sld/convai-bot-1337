@@ -137,7 +137,7 @@ class FSM:
         self._threads.append(t)
 
     def ask_question_to_user(self):
-        self._cancel_timer_threads(reset_question=False)
+        self._cancel_timer_threads(reset_question=False, presereve_cntr=True)
 
         def _too_long_waiting_if_user_inactive():
             if self.is_asked():
