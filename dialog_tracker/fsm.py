@@ -50,6 +50,7 @@ class FSM:
     CHITCHAT_URL = 'tcp://127.0.0.1:5557'
     FB_CHITCHAT_URL = 'tcp://127.0.0.1:5558'
 
+
     CLASSIFY_ANSWER = 'ca'
     CLASSIFY_QUESTION = 'cq'
     CLASSIFY_REPLICA = 'cr'
@@ -59,6 +60,7 @@ class FSM:
 
     WAIT_TIME = 30
     WAIT_TOO_LONG = 60
+    CONVAI_WAIT_QUESTION = 5
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=FSM.states, initial='init')
@@ -166,6 +168,17 @@ class FSM:
         t = threading.Timer(FSM.WAIT_TOO_LONG, _too_long_waiting_if_user_inactive)
         t.start()
         self._threads.append(t)
+
+    def wait_for_user_typing_convai(self):      
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)      
+                
+            def _ask_question_if_user_inactive():      
+                if self.is_started():
+                    self.ask_question()
+                    
+           t = threading.Timer(FSM.CONVAI_WAIT_QUESTION, _ask_question_if_user_inactive)
+           t.start()      
+           self._threads.append(t)
 
     def propose_conversation_ending(self):
         self._cancel_timer_threads()
