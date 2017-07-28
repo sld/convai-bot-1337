@@ -47,6 +47,10 @@ class FSM:
         "What is your job?"
     ]
 
+    CHITCHAT_URL = 'tcp://127.0.0.1:5557'
+    FB_CHITCHAT_URL = 'tcp://127.0.0.1:5558'
+
+
     CLASSIFY_ANSWER = 'ca'
     CLASSIFY_QUESTION = 'cq'
     CLASSIFY_REPLICA = 'cr'
@@ -55,7 +59,7 @@ class FSM:
     ANSWER_INCORRECT = 'ai'
 
     WAIT_TIME = 30
-    WAIT_TOO_LONG = 120
+    WAIT_TOO_LONG = 60
     CONVAI_WAIT_QUESTION = 5
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
@@ -91,6 +95,8 @@ class FSM:
         self.machine.add_transition('too_long_wait', 'waiting', 'waiting', after='say_user_about_long_waiting')
         self.machine.add_transition('user_off', 'waiting', 'init', after='propose_conversation_ending')
 
+        self.machine.add_transition('ask_question_after_waiting', 'waiting', 'asked', after='ask_question_to_user')
+
         self._bot = bot
         self._user = user
         self._chat = chat
@@ -124,23 +130,13 @@ class FSM:
         t.start()
         self._threads.append(t)
 
-    def wait_for_user_typing_convai(self):
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
-
-        def _ask_question_if_user_inactive():
-            if self.is_started():
-                self.ask_question()
-
-        t = threading.Timer(FSM.CONVAI_WAIT_QUESTION, _ask_question_if_user_inactive)
-        t.start()
-        self._threads.append(t)
-
     def ask_question_to_user(self):
         self._cancel_timer_threads(reset_question=False)
 
         def _too_long_waiting_if_user_inactive():
             if self.is_asked():
                 self.long_wait()
+
         self._get_factoid_question()
         self._send_message(self._filter_seq2seq_output(self._factoid_qas[self._qa_ind]['question']))
 
@@ -157,7 +153,10 @@ class FSM:
 
         def _too_long_waiting_if_user_inactive():
             if self.is_waiting() and self._too_long_waiting_cntr < 4:
-                self._send_message(random.sample(FSM.wait_messages, 1)[0])
+                if random.random() > 0.5:
+                    self.ask_question_after_waiting()
+                else:
+                    self._send_message(random.sample(FSM.wait_messages, 1)[0])
                 self.too_long_wait()
             elif self.is_waiting() and self._too_long_waiting_cntr > 3:
                 self.user_off()
@@ -169,6 +168,17 @@ class FSM:
 
         t = threading.Timer(FSM.WAIT_TOO_LONG, _too_long_waiting_if_user_inactive)
         t.start()
+        self._threads.append(t)
+
+    def wait_for_user_typing_convai(self):      
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+
+        def _ask_question_if_user_inactive():      
+            if self.is_started():
+                self.ask_question()
+                    
+        t = threading.Timer(FSM.CONVAI_WAIT_QUESTION, _ask_question_if_user_inactive)
+        t.start()      
         self._threads.append(t)
 
     def propose_conversation_ending(self):
@@ -219,7 +229,10 @@ class FSM:
         self._cancel_timer_threads(reset_question=False)
 
         true_answer = self._factoid_qas[self._qa_ind]['answer']
-        sim = fuzz.ratio(true_answer, self._last_user_message)
+        # make user answer lowercased + remove ending chars
+        true_answer_clean = true_answer.lower().rstrip(' .,;?!')
+        user_answer_clean = self._last_user_message.lower().rstrip(' .,;?!')
+        sim = fuzz.ratio(true_answer_clean, user_answer_clean)
         if sim == 100:
             msg1 = ['It is right', 'And its right answer', 'Right']
             msg2 = ['!', ':)']
@@ -324,7 +337,7 @@ class FSM:
             to_echo = "{}\n{}".format(to_echo, sentence_with_context)
 
         logger.info("Send to opennmt chitchat: {}".format(to_echo))
-        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py tcp://opennmtchitchat:5556".format(to_echo)
+        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, FSM.CHITCHAT_URL)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
@@ -378,7 +391,7 @@ class FSM:
             to_echo = "{}\n{}".format(to_echo, sentence_with_context)
 
         logger.info("Send to fb chitchat: {}".format(to_echo))
-        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py tcp://opennmtfbpost:5556".format(to_echo)
+        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, FSM.FB_CHITCHAT_URL)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
