@@ -66,6 +66,7 @@ class FSM:
         self.machine = Machine(model=self, states=FSM.states, initial='init')
 
         self.machine.add_transition('start', 'init', 'started', after='wait_for_user_typing')
+        self.machine.add_transition('start_convai', 'init', 'started', after='wait_for_user_typing_convai')
         self.machine.add_transition('ask_question', 'started', 'asked', after='ask_question_to_user')
 
         self.machine.add_transition('classify', 'started', 'classifying', after='get_klass_of_user_message')
@@ -170,15 +171,15 @@ class FSM:
         self._threads.append(t)
 
     def wait_for_user_typing_convai(self):      
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)      
-                
-            def _ask_question_if_user_inactive():      
-                if self.is_started():
-                    self.ask_question()
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+
+        def _ask_question_if_user_inactive():      
+            if self.is_started():
+                self.ask_question()
                     
-           t = threading.Timer(FSM.CONVAI_WAIT_QUESTION, _ask_question_if_user_inactive)
-           t.start()      
-           self._threads.append(t)
+        t = threading.Timer(FSM.CONVAI_WAIT_QUESTION, _ask_question_if_user_inactive)
+        t.start()      
+        self._threads.append(t)
 
     def propose_conversation_ending(self):
         self._cancel_timer_threads()
@@ -336,7 +337,7 @@ class FSM:
             to_echo = "{}\n{}".format(to_echo, sentence_with_context)
 
         logger.info("Send to opennmt chitchat: {}".format(to_echo))
-        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, CHITCHAT_URL)
+        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, FSM.CHITCHAT_URL)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
@@ -390,7 +391,7 @@ class FSM:
             to_echo = "{}\n{}".format(to_echo, sentence_with_context)
 
         logger.info("Send to fb chitchat: {}".format(to_echo))
-        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, FB_CHITCHAT_URL)
+        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, FSM.FB_CHITCHAT_URL)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
