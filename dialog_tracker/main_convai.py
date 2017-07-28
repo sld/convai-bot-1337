@@ -68,6 +68,9 @@ class DialogTracker:
                 res = requests.get(os.path.join(self._bot_url, 'getUpdates'), timeout=5)
                 if res.status_code != 200:
                     logger.warn(res.text)
+                if len(res.json()) == 0:
+                    sleep(0.1)
+                    continue
 
                 for m in res.json():
                     logger.info(m)
@@ -81,10 +84,7 @@ class DialogTracker:
                         self._get_qas()
                         self._add_fsm_and_user(update, True)
                         fsm = self._chat_fsm[update.effective_chat.id]
-                        fsm.return_to_init()
-                        fsm.return_to_start()
-                        if self._factoid_qas:
-                            fsm.ask_question()
+                        fsm.start_convai()
                     elif m['message']['text'] == '/end':
                         self._log_user('_end_cmd', update)
                         fsm = self._chat_fsm[update.effective_chat.id]
@@ -116,7 +116,7 @@ class DialogTracker:
                             fsm.classify()
             except Exception as e:
                 logger.exception(str(e))
-            sleep(0.01)
+            sleep(0.1)
 
     def _log_user(self, cmd, update):
         logger_bot.info("USER[{}]: {}".format(cmd, update.message.text))

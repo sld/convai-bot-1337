@@ -56,11 +56,13 @@ class FSM:
 
     WAIT_TIME = 30
     WAIT_TOO_LONG = 120
+    CONVAI_WAIT_QUESTION = 5
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=FSM.states, initial='init')
 
         self.machine.add_transition('start', 'init', 'started', after='wait_for_user_typing')
+        self.machine.add_transition('start_convai', 'init', 'started', after='wait_for_user_typing_convai')
         self.machine.add_transition('ask_question', 'started', 'asked', after='ask_question_to_user')
 
         self.machine.add_transition('classify', 'started', 'classifying', after='get_klass_of_user_message')
@@ -119,6 +121,17 @@ class FSM:
                 self.ask_question()
 
         t = threading.Timer(FSM.WAIT_TIME, _ask_question_if_user_inactive)
+        t.start()
+        self._threads.append(t)
+
+    def wait_for_user_typing_convai(self):
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+
+        def _ask_question_if_user_inactive():
+            if self.is_started():
+                self.ask_question()
+
+        t = threading.Timer(FSM.CONVAI_WAIT_QUESTION, _ask_question_if_user_inactive)
         t.start()
         self._threads.append(t)
 
