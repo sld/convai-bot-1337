@@ -48,16 +48,17 @@ class FSM:
         "What is your job?"
     ]
 
-    CHITCHAT_URL = 'tcp://127.0.0.1:5557'
-    FB_CHITCHAT_URL = 'tcp://127.0.0.1:5558'
+    # CHITCHAT_URL = 'tcp://127.0.0.1:5557'
+    # FB_CHITCHAT_URL = 'tcp://127.0.0.1:5558'
 
-    # CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
-    # FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
+    CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
+    FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
 
     CLASSIFY_ANSWER = 'ca'
     CLASSIFY_QUESTION = 'cq'
     CLASSIFY_REPLICA = 'cr'
     CLASSIFY_FB = 'cf'
+    CLASSIFY_ASK_QUESTION = 'caq'
     ANSWER_CORRECT = 'ac'
     ANSWER_INCORRECT = 'ai'
 
@@ -100,6 +101,7 @@ class FSM:
         self.machine.add_transition('user_off', 'waiting', 'init', after='propose_conversation_ending')
 
         self.machine.add_transition('ask_question_after_waiting', 'waiting', 'asked', after='ask_question_to_user')
+        self.machine.add_transition('ask_question_after_classifying', 'classifying', 'asked', after='ask_question_to_user')
 
         self._bot = bot
         self._user = user
@@ -208,6 +210,10 @@ class FSM:
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
         logger.info(res)
+
+        if ('ask me' in text or 'discuss with me' in text or 'talk with me' in text or 'ask question' in text or 'ask a question' in text) and ("n't" not in text and 'not' not in text):
+            return FSM.CLASSIFY_ASK_QUESTION
+
         if self.is_asked():
             return FSM.CLASSIFY_ANSWER
         if res == '__label__0':
@@ -238,6 +244,8 @@ class FSM:
             self.answer_to_user_replica()
         elif clf_type == FSM.CLASSIFY_FB:
             self.answer_to_user_replica_with_fb()
+        elif clf_type == FSM.CLASSIFY_ASK_QUESTION:
+            self.ask_question_after_classifying()
 
     def _is_not_answer(self, reply):
         reply = normalize(reply)
@@ -362,12 +370,17 @@ class FSM:
         # feed_context = "{} {}".format(self._get_last_bot_reply(), self._last_user_message)
         sentence = self._last_user_message
         sentence_with_context = None
+        user_sent = None
         if len(self._dialog_context) > 0:
             sentence_with_context = " _EOS_ ".join([self._dialog_context[-1][1], self._last_user_message])
+            user_sent = " ".join([self._dialog_context[-1][0], self._last_user_message])
 
         to_echo = sentence
         if sentence_with_context:
             to_echo = "{}\n{}".format(to_echo, sentence_with_context)
+
+        if user_sent:
+            to_echo = "{}\n{}".format(to_echo, user_sent)
 
         logger.info("Send to opennmt chitchat: {}".format(to_echo))
         cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, FSM.CHITCHAT_URL)
@@ -415,13 +428,17 @@ class FSM:
         # feed_context = "{} {}".format(self._get_last_bot_reply(), self._last_user_message)
         sentence = self._last_user_message
         sentence_with_context = None
+        user_sent = None
         if len(self._dialog_context) > 0:
             sentence_with_context = " ".join([self._dialog_context[-1][1], self._last_user_message])
+            user_sent = " ".join([self._dialog_context[-1][0], self._last_user_message])
 
         text_with_sent = "{} {}".format(self._text, self._last_user_message)
         to_echo = "{}\n{}".format(sentence, text_with_sent)
         if sentence_with_context:
             to_echo = "{}\n{}".format(to_echo, sentence_with_context)
+        if user_sent:
+            to_echo = "{}\n{}".format(to_echo, user_sent)
 
         logger.info("Send to fb chitchat: {}".format(to_echo))
         cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, FSM.FB_CHITCHAT_URL)

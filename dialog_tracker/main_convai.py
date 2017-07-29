@@ -24,7 +24,7 @@ bot_file_handler.setFormatter(bot_log_formatter)
 if not logger_bot.handlers:
     logger_bot.addHandler(bot_file_handler)
 
-version = "9 (27.07.2017)"
+version = "10 (29.07.2017)"
 
 
 class DialogTracker:
@@ -39,18 +39,14 @@ class DialogTracker:
 
 
     def greet_user(self, chat_id):
-        hello_messages_1 = ['Hi', 'Hello', 'Hello my friend', 'Hi my friend',
-                          'Greetings', 'Hello, my friend', 'Hi, my friend']
+        hello_messages_1 = ['Well hello there!', 'How’s it going?', 'What’s up?',
+                            'Yo!', 'Alright mate?', 'Whazzup?', 'Hiya!',
+                            'Nice to see you!', 'Good to see you!']
+        hello_messages_2 = ["Let's discuss this awesome text!",
+            "I'm coming up with a question about the text...",
+            "Would you mind to ask me some factual question about the text?"]
 
-        hello_messages_2 = ['It is a pleasure to speak with you',
-                            'I hope you will enjoy this conversation',
-                            'Hope this chat will go well']
-
-        hello_messages_3 = ['Wait a second for my factoid question',
-                            "I will ask you a question in a second, please wait"]
-
-        greet_messages = [hello_messages_1, ['.', '!'], hello_messages_2, ['.'],
-                          hello_messages_3, ['.', '!', ''] ]
+        greet_messages = [hello_messages_1, hello_messages_2]
         msg = combinate_and_return_answer(greet_messages)
         self._bot.send_message(chat_id=chat_id, text=msg)
 
@@ -89,7 +85,7 @@ class DialogTracker:
                         self._log_user('_end_cmd', update)
                         fsm = self._chat_fsm[update.effective_chat.id]
                         fsm.return_to_init()
-                    elif m['message']['text'].startswith('version'):
+                    elif m['message']['text'] == 'version':
                         self._log_user('version', update)
                         self._add_fsm_and_user(update)
                         fsm = self._chat_fsm[update.effective_chat.id]
