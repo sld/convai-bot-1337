@@ -48,11 +48,11 @@ class FSM:
         "What is your job?"
     ]
 
-    # CHITCHAT_URL = 'tcp://127.0.0.1:5557'
-    # FB_CHITCHAT_URL = 'tcp://127.0.0.1:5558'
+    CHITCHAT_URL = 'tcp://127.0.0.1:5557'
+    FB_CHITCHAT_URL = 'tcp://127.0.0.1:5558'
 
-    CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
-    FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
+    # CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
+    # FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
 
     CLASSIFY_ANSWER = 'ca'
     CLASSIFY_QUESTION = 'cq'
