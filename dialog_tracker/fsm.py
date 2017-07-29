@@ -48,11 +48,11 @@ class FSM:
         "What is your job?"
     ]
 
-    CHITCHAT_URL = 'tcp://127.0.0.1:5557'
-    FB_CHITCHAT_URL = 'tcp://127.0.0.1:5558'
+    # CHITCHAT_URL = 'tcp://127.0.0.1:5557'
+    # FB_CHITCHAT_URL = 'tcp://127.0.0.1:5558'
 
-    # CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
-    # FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
+    CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
+    FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
 
     CLASSIFY_ANSWER = 'ca'
     CLASSIFY_QUESTION = 'cq'
@@ -279,7 +279,7 @@ class FSM:
         if self._is_not_answer(self._last_user_message) and tokens_count > 2:
             self.classify()
             return
-        
+
         true_answer = self._last_factoid_qas['answer']
         sim = self._is_user_answer_correct()
 
@@ -329,7 +329,7 @@ class FSM:
                 self.return_to_asked()
                 self._is_first_incorrect = False
             else:
-                msg = "😕" 
+                msg = "😕"
                 if random.random() > 0.5:
                     msg1 = ['Still incorrect', 'Incorrect', 'Maybe other time']
                     msg2 = ['.', ':(']
@@ -345,7 +345,7 @@ class FSM:
                 total_msg = [msg3, msg4, msg5, msg6]
                 msg = combinate_and_return_answer(total_msg)
                 self._send_message(msg)
-                
+
                 self._question_asked = False
                 self.return_to_wait()
                 self._is_first_incorrect = True
