@@ -211,7 +211,9 @@ class FSM:
         res = str(output, "utf-8").strip()
         logger.info(res)
 
-        if ('ask me' in text or 'discuss with me' in text or 'talk with me' in text or 'ask question' in text or 'ask a question' in text) and ("n't" not in text and 'not' not in text):
+        if ('ask me' in text or 'discuss with me' in text or 'talk with me' in text \
+            or 'ask question' in text or 'ask a question' in text or 'next question' in text) \
+            and ("n't" not in text and 'not' not in text):
             return FSM.CLASSIFY_ASK_QUESTION
 
         logger.info('_classify: QUESTION ASKED: {}'.format(self._question_asked))
