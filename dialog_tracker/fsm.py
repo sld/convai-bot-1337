@@ -214,6 +214,11 @@ class FSM:
         if ('ask me' in text or 'discuss with me' in text or 'talk with me' in text or 'ask question' in text or 'ask a question' in text) and ("n't" not in text and 'not' not in text):
             return FSM.CLASSIFY_ASK_QUESTION
 
+        logger.info('_classify: QUESTION ASKED: {}'.format(self._question_asked))
+
+        if self._question_asked and self._is_user_answer_correct() >= 80:
+            return FSM.CLASSIFY_ANSWER
+
         if self.is_asked():
             return FSM.CLASSIFY_ANSWER
         if res == '__label__0':
@@ -259,28 +264,37 @@ class FSM:
         else:
             return True
 
-    def checking_user_answer(self):
-        self._cancel_timer_threads(reset_question=False)
-
+    def _is_user_answer_correct(self):
         true_answer = self._last_factoid_qas['answer']
-        tokens_count = len(word_tokenize(self._last_user_message))
-        if self._is_not_answer(self._last_user_message) and tokens_count > 2:
-            self.classify()
-            return
-
         # make user answer lowercased + remove ending chars
         true_answer_clean = true_answer.lower().rstrip(' .,;?!')
         user_answer_clean = self._last_user_message.lower().rstrip(' .,;?!')
         sim = fuzz.ratio(true_answer_clean, user_answer_clean)
+        return sim
+
+    def checking_user_answer(self):
+        self._cancel_timer_threads(reset_question=False)
+
+        tokens_count = len(word_tokenize(self._last_user_message))
+        if self._is_not_answer(self._last_user_message) and tokens_count > 2:
+            self.classify()
+            return
+        
+        true_answer = self._last_factoid_qas['answer']
+        sim = self._is_user_answer_correct()
+
         if sim == 100:
-            msg1 = ['It is right', 'And its right answer', 'Right']
-            msg2 = ['!', ':)']
-            msg3 = ["You're smart.", ""]
-            msg4 = ["Ask me something or wait for my new question", "Ask me or wait my new question"]
-            msg5 = ["🌈", ":)", ""]
-            total_msg = [msg1, msg2, msg3, msg4, msg5]
-            msg = combinate_and_return_answer(total_msg)
+            msg = "👍"
+            if random.random() > 0.6:
+                msg1 = ['It is right', 'And its right answer', 'Right']
+                msg2 = ['!', ':)']
+                msg3 = ["You're smart.", ""]
+                msg4 = ["Ask me something or wait for my new question", "Ask me or wait my new question"]
+                msg5 = ["🌈", ":)", ""]
+                total_msg = [msg1, msg2, msg3, msg4, msg5]
+                msg = combinate_and_return_answer(total_msg)
             self._send_message(msg)
+            self._question_asked = False
             self.correct_user_answer()
             self.return_to_start()
         elif sim >= 80:
@@ -292,13 +306,15 @@ class FSM:
             total_msg = [msg1, msg2, msg3, msg4, msg5]
             msg = combinate_and_return_answer(total_msg)
             self._send_message(msg)
+            self._question_asked = False
             self.correct_user_answer()
             self.return_to_start()
         else:
             self.incorrect_user_answer()
             if self._is_first_incorrect is True:
+
                 msg1 = ["You can do better", "Show me your best", "It is incorrect"]
-                msg2 = [".", "!", ":)"]
+                msg2 = [".", "!", ":)", '¯\_(ツ)_/¯']
                 if len(true_answer) > 3:
                     msg3 = ["Hint: first 3 letters is {}.".format(true_answer[:3])]
                 else:
@@ -313,17 +329,24 @@ class FSM:
                 self.return_to_asked()
                 self._is_first_incorrect = False
             else:
-                msg1 = ['Still incorrect', 'Incorrect', 'Maybe other time']
-                msg2 = ['.', ':(']
+                msg = "😕" 
+                if random.random() > 0.5:
+                    msg1 = ['Still incorrect', 'Incorrect', 'Maybe other time']
+                    msg2 = ['.', ':(']
+                    total_msg = [msg1, msg2]
+                    msg = combinate_and_return_answer(total_msg)
+
+                self._send_message(msg)
+
                 msg3 = ['I think that']
                 msg4 = ['correct answer', 'true answer', 'answer']
                 msg5 =  ['is: {}'.format(true_answer)]
                 msg6 = [":)", "", "."]
-                total_msg = [msg1, msg2, msg3, msg4, msg5, msg6]
-
+                total_msg = [msg3, msg4, msg5, msg6]
                 msg = combinate_and_return_answer(total_msg)
-
                 self._send_message(msg)
+                
+                self._question_asked = False
                 self.return_to_wait()
                 self._is_first_incorrect = True
 
@@ -350,13 +373,13 @@ class FSM:
         return str(out, "utf-8").strip()
 
     def answer_to_user_replica_(self):
-        self._cancel_timer_threads(reset_seq2seq_context=False)
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
         bots_answer = self._get_opennmt_chitchat_reply()
         self._send_message(bots_answer)
         self.return_to_wait()
 
     def answer_to_user_replica_with_fb_(self):
-        self._cancel_timer_threads(reset_seq2seq_context=False)
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
         bots_answer = self._get_opennmt_fb_reply()
         self._send_message(bots_answer)
         self.return_to_wait()
