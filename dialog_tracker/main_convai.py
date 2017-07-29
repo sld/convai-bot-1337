@@ -44,7 +44,7 @@ class DialogTracker:
                             'Nice to see you!', 'Good to see you!']
         hello_messages_2 = ["Let's discuss this awesome text!",
             "I'm coming up with a question about the text...",
-            "Would you mind to ask me some factual question about the text?"]
+            "Would you mind to ask me some factual question about the text? Maybe I'll do it first..." ]
 
         greet_messages = [hello_messages_1, hello_messages_2]
         msg = combinate_and_return_answer(greet_messages)
