@@ -48,11 +48,11 @@ class FSM:
         "What is your job?"
     ]
 
-    CHITCHAT_URL = 'tcp://127.0.0.1:5557'
-    FB_CHITCHAT_URL = 'tcp://127.0.0.1:5558'
+    #CHITCHAT_URL = 'tcp://127.0.0.1:5557'
+    #FB_CHITCHAT_URL = 'tcp://127.0.0.1:5558'
 
-    # CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
-    # FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
+    CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
+    FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
 
     CLASSIFY_ANSWER = 'ca'
     CLASSIFY_QUESTION = 'cq'
@@ -113,6 +113,9 @@ class FSM:
         self._init_factoid_qas_and_text()
         self._dialog_context = []
         self._is_first_incorrect = True
+        # to prevent recursion call
+        self._is_chitchat_replica_is_answer = False
+
 
     def _init_factoid_qas_and_text(self):
         # list of all questions and answers
@@ -237,7 +240,9 @@ class FSM:
     def _classify_user_utterance(self, clf_type):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
+        self._is_chitchat_replica_is_answer = False
         if clf_type == FSM.CLASSIFY_ANSWER and self._question_asked:
+            self._is_chitchat_replica_is_answer = True
             self.check_user_answer()
         elif clf_type == FSM.CLASSIFY_ANSWER and not self._question_asked:
             self._send_message(("I did not ask you a question. Then why do you think"
@@ -276,7 +281,7 @@ class FSM:
         self._cancel_timer_threads(reset_question=False)
 
         tokens_count = len(word_tokenize(self._last_user_message))
-        if self._is_not_answer(self._last_user_message) and tokens_count > 2:
+        if self._is_not_answer(self._last_user_message) and tokens_count > 2 and not self._is_chitchat_replica_is_answer:
             self.classify()
             return
         
