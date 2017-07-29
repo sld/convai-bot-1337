@@ -408,6 +408,10 @@ class FSM:
         return best_resp
 
     def _is_bad_resp(self, resp):
+        if len(self._dialog_context) > 1:
+            if (self._dialog_context[-2][1] == self._dialog_context[-1][1]):
+                return True
+
         if '<unk>' in resp or re.match('\w', resp) is None or ('youtube' in resp and 'www' in resp and 'watch' in resp):
             return True
         else:
