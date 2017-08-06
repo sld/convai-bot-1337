@@ -59,9 +59,9 @@ class FSM:
     ANSWER_CORRECT = 'ac'
     ANSWER_INCORRECT = 'ai'
 
-    WAIT_TIME = 30
-    WAIT_TOO_LONG = 60
-    CONVAI_WAIT_QUESTION = 5
+    WAIT_TIME = 200
+    WAIT_TOO_LONG = 400
+    CONVAI_WAIT_QUESTION = 100
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=FSM.states, initial='init')
@@ -537,8 +537,8 @@ class FSM:
         [t.cancel() for t in self._threads]
 
     def _filter_seq2seq_output(self, s):
-        s = "{}{}".format(s[0].upper(), s[1:])
-        s = "'".join([w.strip() for w in s.split("'")])
+        s = normalize(str(s))
+        s = detokenize(s)
         return s
 
     def clear_all(self):
