@@ -7,12 +7,5 @@
 
 # How to run
 
-`docker-compose -f docker-compose.yml -f convai.yml up -d --build`
-
-
-# How to
-
-1. wget https://s3.eu-central-1.amazonaws.com/convai/convai-bot-1337-ver6.tar.gz
-2. tar -zxvf convai-bot-1337-ver6.tar.gz
-3. cd convai-bot-1337-to-send/
-4. docker-compose -f docker-compose.yml -f convai.yml up -d --build
+1. `cp dialog_tracker/config.example.py dialog_tracker/config.py`
+2. `docker-compose -f docker-compose.yml -f convai.yml up -d --build`
