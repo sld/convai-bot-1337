@@ -1,10 +1,11 @@
-import json_api
+import api_wrappers.json_wrapper as json_api
 import logging
 import subprocess
 
 from flask import request, jsonify, url_for, Flask
+from config import version
 from uuid import uuid4
-from fsm import FSM
+from bot_brain import BotBrain
 
 
 app = Flask(__name__)
@@ -18,9 +19,6 @@ bot_log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - 
 bot_file_handler.setFormatter(bot_log_formatter)
 if not logger_bot.handlers:
     logger_bot.addHandler(bot_file_handler)
-
-version = "11 (06.08.2017)"
-
 
 chat_fsm = {}
 
@@ -94,7 +92,7 @@ def end():
 
 def add_fsm_and_user(update, bot, text_and_qa, hard=False):
     if update.effective_chat.id not in chat_fsm:
-        fsm = FSM(bot, update.effective_user, update.effective_chat, text_and_qa)
+        fsm = BotBrain(bot, update.effective_user, update.effective_chat, text_and_qa)
         chat_fsm[update.effective_chat.id] = fsm
     elif update.effective_user.id in chat_fsm and hard:
         chat_fsm[update.effective_chat.id].set_text_and_qa(text_and_qa)

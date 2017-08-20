@@ -4,7 +4,7 @@ services:
     build:
       context: './dialog_tracker/'
     image: 'dialog_tracker:1'
-    command: python main_api.py
+    command: python json_api_main.py
     restart: 'no'
     volumes:
       - ./dialog_tracker:/src

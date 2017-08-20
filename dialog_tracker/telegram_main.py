@@ -3,8 +3,9 @@ import telegram
 import json
 
 from random import sample
+from config import version
 from time import sleep
-from fsm import FSM
+from bot_brain import BotBrain, greet_user
 from sys import argv
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
@@ -19,8 +20,6 @@ bot_log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - 
 bot_file_handler.setFormatter(bot_log_formatter)
 if not logger_bot.handlers:
     logger_bot.addHandler(bot_file_handler)
-
-version = "9 (27.07.2017)"
 
 
 def load_text_and_qas(filename):
@@ -93,18 +92,9 @@ class DialogTracker:
 
         logger_bot.info("BOT[_start_cmd] text_id: {}".format(self._text_ind))
 
-        message = 'Hi {}!'.format(update.effective_user.first_name)
-        update.message.reply_text(message)
+        update.message.reply_text("\"{}\"".format(self._text()))
 
-        message = ("I'm Convai.io bot#1337. My main goal is to talk about the text"
-                   " provided below. You can ask me questions about the text,"
-                   " give answers to my questions and even chit-chat about anything."
-                   " Type /help to get some more information.")
-        update.message.reply_text(message)
-
-        update.message.reply_text("The text: \"{}\"".format(self._text()))
-        update.message.reply_text("Also you can the get text by using /text command")
-        update.message.reply_text("Ask me something or I'll do it in 45 seconds")
+        greet_user(bot, update.effective_chat.id)
 
         self._add_fsm_and_user(update, True)
         fsm = self._users_fsm[update.effective_user.id]
@@ -163,7 +153,7 @@ class DialogTracker:
 
     def _add_fsm_and_user(self, update, hard=False):
         if update.effective_user.id not in self._users_fsm:
-            fsm = FSM(self._bot, update.effective_chat, update.effective_user, self._text_and_qa())
+            fsm = BotBrain(self._bot, update.effective_chat, update.effective_user, self._text_and_qa())
             self._users_fsm[update.effective_user.id] = fsm
             self._users[update.effective_user.id] = update.effective_user
         elif update.effective_user.id in self._users_fsm and hard:

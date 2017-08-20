@@ -34,7 +34,23 @@ def combinate_and_return_answer(arr):
         return msg
 
 
-class FSM:
+# NOTE: Оставил тут, т.к. непонятно как добавлять в fsm.
+# Может быть так, что юзер у нас что-то спросил, а мы его только поприветствовали
+# Как бы это решить? В голову приходит только многопоточка и асинхронное программирование
+def greet_user(bot, chat_id):
+    hello_messages_1 = ['Well hello there!', 'How’s it going?', 'What’s up?',
+                        'Yo!', 'Alright mate?', 'Whazzup?', 'Hiya!',
+                        'Nice to see you!', 'Good to see you!']
+    hello_messages_2 = ["Let's discuss this awesome text!",
+        "I'm coming up with a question about the text...",
+        "Would you mind to ask me some factual question about the text? Maybe I'll do it first..." ]
+
+    greet_messages = [hello_messages_1, hello_messages_2]
+    msg = combinate_and_return_answer(greet_messages)
+    bot.send_message(chat_id=chat_id, text=msg)
+
+
+class BotBrain:
     states = [
       'init', 'started', 'asked', 'waiting', 'classifying', 'ending', 'checking_answer',
       'correct_answer', 'incorrect_answer', 'bot_answering_question', 'bot_answering_replica',
@@ -61,7 +77,7 @@ class FSM:
     ANSWER_INCORRECT = 'ai'
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
-        self.machine = Machine(model=self, states=FSM.states, initial='init')
+        self.machine = Machine(model=self, states=BotBrain.states, initial='init')
 
         self.machine.add_transition('start', 'init', 'started', after='wait_for_user_typing')
         self.machine.add_transition('start_convai', 'init', 'started', after='wait_for_user_typing_convai')
@@ -145,7 +161,7 @@ class FSM:
         if self._get_factoid_question() is not None:
             self._send_message(self._filter_seq2seq_output(self._last_factoid_qas['question']))
         else:
-            self._send_message(random.sample(FSM.wait_messages, 1)[0])
+            self._send_message(random.sample(BotBrain.wait_messages, 1)[0])
             self.return_to_wait()
 
         t = threading.Timer(config.WAIT_TOO_LONG, _too_long_waiting_if_user_inactive)
@@ -169,7 +185,7 @@ class FSM:
                 if random.random() > 0.5:
                     self.ask_question_after_waiting()
                 else:
-                    self._send_message(random.sample(FSM.wait_messages, 1)[0])
+                    self._send_message(random.sample(BotBrain.wait_messages, 1)[0])
                 self.too_long_wait()
             elif self.is_waiting() and self._too_long_waiting_cntr > 3:
                 self.user_off()
@@ -211,21 +227,21 @@ class FSM:
         if ('ask me' in text or 'discuss with me' in text or 'talk with me' in text \
             or 'ask question' in text or 'ask a question' in text or 'next question' in text) \
             and ("n't" not in text and 'not' not in text):
-            return FSM.CLASSIFY_ASK_QUESTION
+            return BotBrain.CLASSIFY_ASK_QUESTION
 
         logger.info('_classify: QUESTION ASKED: {}'.format(self._question_asked))
 
         if self._question_asked and self._is_user_answer_correct() >= 80:
-            return FSM.CLASSIFY_ANSWER
+            return BotBrain.CLASSIFY_ANSWER
 
         if self.is_asked():
-            return FSM.CLASSIFY_ANSWER
+            return BotBrain.CLASSIFY_ANSWER
         if res == '__label__0':
-            return FSM.CLASSIFY_REPLICA
+            return BotBrain.CLASSIFY_REPLICA
         elif res == '__label__1':
-            return FSM.CLASSIFY_QUESTION
+            return BotBrain.CLASSIFY_QUESTION
         elif res == '__label__2':
-            return FSM.CLASSIFY_FB
+            return BotBrain.CLASSIFY_FB
 
     def get_klass_of_user_message(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
@@ -237,20 +253,20 @@ class FSM:
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
         self._is_chitchat_replica_is_answer = False
-        if clf_type == FSM.CLASSIFY_ANSWER and self._question_asked:
+        if clf_type == BotBrain.CLASSIFY_ANSWER and self._question_asked:
             self._is_chitchat_replica_is_answer = True
             self.check_user_answer()
-        elif clf_type == FSM.CLASSIFY_ANSWER and not self._question_asked:
+        elif clf_type == BotBrain.CLASSIFY_ANSWER and not self._question_asked:
             self._send_message(("I did not ask you a question. Then why do you think"
                 " it has the answer type? My last sentence is a rhetorical question 😋"))
             self.return_to_start()
-        elif clf_type == FSM.CLASSIFY_QUESTION:
+        elif clf_type == BotBrain.CLASSIFY_QUESTION:
             self.answer_to_user_question()
-        elif clf_type == FSM.CLASSIFY_REPLICA:
+        elif clf_type == BotBrain.CLASSIFY_REPLICA:
             self.answer_to_user_replica()
-        elif clf_type == FSM.CLASSIFY_FB:
+        elif clf_type == BotBrain.CLASSIFY_FB:
             self.answer_to_user_replica_with_fb()
-        elif clf_type == FSM.CLASSIFY_ASK_QUESTION:
+        elif clf_type == BotBrain.CLASSIFY_ASK_QUESTION:
             self.ask_question_after_classifying()
 
     def _is_not_answer(self, reply):
@@ -408,7 +424,7 @@ class FSM:
             to_echo = "{}\n{}".format(to_echo, user_sent)
 
         logger.info("Send to opennmt chitchat: {}".format(to_echo))
-        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, FSM.CHITCHAT_URL)
+        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, BotBrain.CHITCHAT_URL)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
@@ -470,7 +486,7 @@ class FSM:
             to_echo = "{}\n{}".format(to_echo, user_sent)
 
         logger.info("Send to fb chitchat: {}".format(to_echo))
-        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, FSM.FB_CHITCHAT_URL)
+        cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, BotBrain.FB_CHITCHAT_URL)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
@@ -501,10 +517,10 @@ class FSM:
     def _classify_user_response_to_bot_answer(self, clf_type):
         self._cancel_timer_threads()
 
-        if clf_type == FSM.ANSWER_CORRECT:
+        if clf_type == BotBrain.ANSWER_CORRECT:
             self.answer_to_user_question_correct()
             self._send_message("Hooray! I'm smart {}".format(telegram.Emoji.SMILING_FACE_WITH_SUNGLASSES))
-        elif clf_type == FSM.ANSWER_INCORRECT:
+        elif clf_type == BotBrain.ANSWER_INCORRECT:
             self.answer_to_user_question_incorrect()
             self._send_message(("Maybe 42? Sorry, I don't know the answer 🤔\n"
                                 " I hope my master will make me smarter."))

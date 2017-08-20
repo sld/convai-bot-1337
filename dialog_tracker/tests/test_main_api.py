@@ -67,7 +67,3 @@ if __name__ == '__main__':
     conversation_example(url)
     print("")
     conversation_example_without_text(url)
-
-
-
-

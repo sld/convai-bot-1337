@@ -1,4 +1,4 @@
 version: "3"
 services:
   dialog_tracker_convai:
-    command: python main_convai.py "https://ipavlov.mipt.ru/nipsrouter-alt/F0690A4D-B999-46F0-AD14-C65C13F09C40"
+    command: python convai_main.py "https://ipavlov.mipt.ru/nipsrouter-alt/F0690A4D-B999-46F0-AD14-C65C13F09C40"
