@@ -1,8 +1,9 @@
-from flask import request, jsonify, url_for, Flask
-from uuid import uuid4
 import json_api
 import logging
 import subprocess
+
+from flask import request, jsonify, url_for, Flask
+from uuid import uuid4
 from fsm import FSM
 
 

@@ -6,6 +6,7 @@ import random
 import subprocess
 import requests
 import re
+import config
 
 from fuzzywuzzy import fuzz
 from nltk import word_tokenize
@@ -58,10 +59,6 @@ class FSM:
     CLASSIFY_ASK_QUESTION = 'caq'
     ANSWER_CORRECT = 'ac'
     ANSWER_INCORRECT = 'ai'
-
-    WAIT_TIME = 200
-    WAIT_TOO_LONG = 400
-    CONVAI_WAIT_QUESTION = 100
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=FSM.states, initial='init')
@@ -134,7 +131,7 @@ class FSM:
             if self.is_started():
                 self.ask_question()
 
-        t = threading.Timer(FSM.WAIT_TIME, _ask_question_if_user_inactive)
+        t = threading.Timer(config.WAIT_TIME, _ask_question_if_user_inactive)
         t.start()
         self._threads.append(t)
 
@@ -151,7 +148,7 @@ class FSM:
             self._send_message(random.sample(FSM.wait_messages, 1)[0])
             self.return_to_wait()
 
-        t = threading.Timer(FSM.WAIT_TOO_LONG, _too_long_waiting_if_user_inactive)
+        t = threading.Timer(config.WAIT_TOO_LONG, _too_long_waiting_if_user_inactive)
         t.start()
         self._threads.append(t)
 
@@ -182,7 +179,7 @@ class FSM:
 
         self._too_long_waiting_cntr += 1
 
-        t = threading.Timer(FSM.WAIT_TOO_LONG, _too_long_waiting_if_user_inactive)
+        t = threading.Timer(config.WAIT_TOO_LONG, _too_long_waiting_if_user_inactive)
         t.start()
         self._threads.append(t)
 
@@ -193,7 +190,7 @@ class FSM:
             if self.is_started():
                 self.ask_question()
 
-        t = threading.Timer(FSM.CONVAI_WAIT_QUESTION, _ask_question_if_user_inactive)
+        t = threading.Timer(config.CONVAI_WAIT_QUESTION, _ask_question_if_user_inactive)
         t.start()
         self._threads.append(t)
 
