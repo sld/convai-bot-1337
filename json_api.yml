@@ -1,11 +1,11 @@
 version: "3"
 services:
-  dialog_tracker:
+  dialog_tracker_json_api:
     build:
       context: './dialog_tracker/'
     image: 'dialog_tracker:1'
-    command: python main.py prod
-    restart: 'always'
+    command: python json_api_main.py
+    restart: 'no'
     volumes:
       - ./dialog_tracker:/src
     depends_on:
@@ -13,6 +13,8 @@ services:
       - opennmt
       - opennmtchitchat
       - opennmtfbpost
+    ports:
+      - '5000:5000'
     deploy:
       resources:
         limits:

@@ -1,16 +1,17 @@
 import logging
 import telegram
 import json
-import convai_api
+import api_wrappers.convai as convai_api
 import requests
 import os
 import subprocess
 
 from random import sample
 from time import sleep
-from fsm import FSM, combinate_and_return_answer
+from bot_brain import BotBrain, combinate_and_return_answer, greet_user
 from sys import argv
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
+from config import version
 
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -24,8 +25,6 @@ bot_file_handler.setFormatter(bot_log_formatter)
 if not logger_bot.handlers:
     logger_bot.addHandler(bot_file_handler)
 
-version = "10 (29.07.2017)"
-
 
 class DialogTracker:
     def __init__(self, bot_url):
@@ -36,27 +35,6 @@ class DialogTracker:
         self._users = {}
         self._text = 'God'
         self._factoid_qas = []
-
-
-    def greet_user(self, chat_id):
-        hello_messages_1 = ['Well hello there!', 'How’s it going?', 'What’s up?',
-                            'Yo!', 'Alright mate?', 'Whazzup?', 'Hiya!',
-                            'Nice to see you!', 'Good to see you!']
-        hello_messages_2 = ["Let's discuss this awesome text!",
-            "I'm coming up with a question about the text...",
-            "Would you mind to ask me some factual question about the text? Maybe I'll do it first..." ]
-
-        greet_messages = [hello_messages_1, hello_messages_2]
-        msg = combinate_and_return_answer(greet_messages)
-        self._bot.send_message(chat_id=chat_id, text=msg)
-
-    def bye_user(self, chat_id):
-        bye_msg_1 = ['Thanks', 'Thx', 'Thank you']
-        bye_msg_2 = ['for your time']
-        bye_msg_3 = ['Bye', 'Goodbye', 'See you later']
-        bye_msgs = [bye_msg_1, bye_msg_2, ['.', '!'], bye_msg_3, ['.', '!', '']]
-        msg = combinate_and_return_answer(bye_msgs)
-        self._bot.send_message(chat_id=chat_id, text=msg)
 
     def start(self):
         while True:
@@ -74,7 +52,7 @@ class DialogTracker:
                     if m['message']['text'].startswith('/start '):
                         self._log_user('_start_or_begin_or_test_cmd', update)
 
-                        self.greet_user(update.effective_chat.id)
+                        greet_user(self._bot, update.effective_chat.id)
 
                         self._text = m['message']['text'][len('/start '):]
                         self._get_qas()
@@ -106,6 +84,7 @@ class DialogTracker:
                             fsm._send_message('Text is not given. Please try to type /end and /test to reset the state and get text.')
                             continue
 
+                        # Do we need this if else?
                         if fsm.is_asked():
                             fsm.check_user_answer_on_asked()
                         else:
@@ -119,7 +98,7 @@ class DialogTracker:
 
     def _add_fsm_and_user(self, update, hard=False):
         if update.effective_chat.id not in self._chat_fsm:
-            fsm = FSM(self._bot, update.effective_user, update.effective_chat, self._text_and_qa())
+            fsm = BotBrain(self._bot, update.effective_user, update.effective_chat, self._text_and_qa())
             self._chat_fsm[update.effective_chat.id] = fsm
             self._users[update.effective_user.id] = update.effective_user
         elif update.effective_user.id in self._chat_fsm and hard:

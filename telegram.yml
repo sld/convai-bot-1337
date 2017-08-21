@@ -1,10 +1,10 @@
 version: "3"
 services:
-  dialog_tracker_convai:
+  dialog_tracker:
     build:
       context: './dialog_tracker/'
     image: 'dialog_tracker:1'
-    command: python convai_main.py "https://ipavlov.mipt.ru/nipsrouter/F0690A4D-B999-46F0-AD14-C65C13F09C40"
+    command: python telegram_main.py test
     restart: 'always'
     volumes:
       - ./dialog_tracker:/src
@@ -17,3 +17,4 @@ services:
       resources:
         limits:
           memory: 512M
+
