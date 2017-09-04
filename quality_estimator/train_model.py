@@ -87,11 +87,11 @@ def main():
 
     model = Model()
     loss_function = nn.NLLLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    optimizer = torch.optim.Adam(model.parameters())
 
     for epoch in range(10):
         avg_loss = 0
-        for ind, dialog in tqdm(enumerate(X_train[:50])):
+        for ind, dialog in tqdm(enumerate(X_train)):
             model.zero_grad()
             model.hidden = model.init_hidden()
 
