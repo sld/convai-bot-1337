@@ -12,12 +12,15 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         # Bx50
-        self.word_embeddings = nn.Embedding(10035, 50)
+        self.word_embeddings = nn.Embedding(10037, 50)
         # Bx10
         self.user_bot_embeddings = nn.Embedding(4, 10)
         self.rnn = nn.GRU(60, 128, 1)
         self.linear = nn.Linear(128, 3)
         self.softmax = nn.LogSoftmax()
+
+        self.linear_utterance = nn.Linear(128, 3)
+        self.softmax_utterance = nn.LogSoftmax()
 
         self.hidden = self.init_hidden()
 
@@ -25,7 +28,7 @@ class Model(nn.Module):
         return Variable(torch.zeros(1, 1, 128))
 
     # input => Bx2xN, B - sentence len
-    def forward(self, input, calc_softmax=False):
+    def forward(self, input, calc_softmax=False, calc_utterance_softmax=False):
         word_emb = self.word_embeddings(input[:, 0, :])
         user_bot_emb = self.user_bot_embeddings(input[:, 1, :])
         input_combined = torch.cat((word_emb, user_bot_emb), 2)
@@ -36,6 +39,10 @@ class Model(nn.Module):
 
         if calc_softmax:
             probs = self.softmax(output)
+            return self.hidden, probs
+        elif calc_utterance_softmax:
+            output_utterance = self.linear_utterance(self.hidden).view(1, 3)
+            probs = self.softmax_utterance(output_utterance)
             return self.hidden, probs
         else:
             return self.hidden, output
@@ -51,6 +58,13 @@ def load_dialogs_and_labels(filename):
             dialog.append(torch.LongTensor(sent_vec).view(1, 2, -1))
         dialogs.append(dialog)
     return dialogs, labels
+
+
+def load_sent_labels(filename):
+    with open(filename, 'rb') as f:
+        labels = pickle.load(f)
+
+    return labels
 
 
 def measure_model_quality(model, loss_function, X_test, y_test):
@@ -80,8 +94,9 @@ def measure_model_quality(model, loss_function, X_test, y_test):
 
 def main():
     dialogs, labels = load_dialogs_and_labels('data/dilogs_and_labels.pickle')
-    X_train, X_test, y_train, y_test = train_test_split(
-        dialogs, labels, test_size=0.15, random_state=42
+    sents_labels = load_sent_labels('data/sent_eval_labels.pickle')
+    X_train, X_test, y_train, y_test, s_train, s_test = train_test_split(
+        dialogs, labels, sents_labels, test_size=0.15, random_state=42
     )
     y_train = Variable(torch.LongTensor(y_train))
 
@@ -94,10 +109,19 @@ def main():
         for ind, dialog in tqdm(enumerate(X_train)):
             model.zero_grad()
             model.hidden = model.init_hidden()
+            sent_labels = Variable(torch.LongTensor(s_train[ind]))
 
-            for sent in dialog[:-1]:
+            avg_loss_sent = 0
+            for j, sent in enumerate(dialog[:-1]):
+                model.zero_grad()
                 input = Variable(torch.LongTensor(sent))
-                hidden, out = model(input)
+                hidden, out = model(input, False, True)
+                loss = loss_function(out, sent_labels[j])
+                avg_loss_sent += loss.data[0]
+                loss.backward(retain_graph=True)
+                optimizer.step()
+            print("Loss sent: {}".format(avg_loss_sent / len(dialog[:-1])))
+
             input = Variable(torch.LongTensor(dialog[-1]))
             hidden, out = model(input, True)
 

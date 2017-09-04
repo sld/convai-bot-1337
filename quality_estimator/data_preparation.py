@@ -50,10 +50,12 @@ def create_dataset(filtered):
         dialog = [('<SOD>', ['<SOD>'])]
         for r in d['thread']:
             words = [w.lower() for w in word_tokenize(r['text'])]
+            words.insert(0, '<BOS>')
+            words.append('<EOS>')
             if r['userId'] == user:
-                dialog.append(('user', words))
+                dialog.append(('user', words, r['evaluation']))
             else:
-                dialog.append(('bot', words))
+                dialog.append(('bot', words, r['evaluation']))
         dialog.append(('<EOD>', ['<EOD>']))
         dialogs.append(dialog)
         labels.append(label)
@@ -91,6 +93,19 @@ def make_vectored_dialogs(dialogs, word_ix, user_bot_ix):
     return dialogs_vecs
 
 
+def make_dialog_sent_eval_labels(dialogs):
+    dialogs_labels = []
+    for d in dialogs:
+        sent_labels = []
+        for s in d:
+            if len(s) > 2:
+                sent_labels.append(s[2])
+            else:
+                sent_labels.append(0)
+        dialogs_labels.append(sent_labels)
+    return dialogs_labels
+
+
 def main():
     with open("data/train_full.json") as f:
         dialogs = json.load(f)
@@ -104,8 +119,14 @@ def main():
 
     dialogs_vectored = make_vectored_dialogs(dialogs, word_ix, user_bot_ix)
 
+    sent_eval_labels = make_dialog_sent_eval_labels(dialogs)
+
     with open('data/dilogs_and_labels.pickle', 'wb') as f:
         pickle.dump([dialogs_vectored, labels], f)
+
+    with open('data/sent_eval_labels.pickle', 'wb') as f:
+        pickle.dump(sent_eval_labels, f)
+
 
 
 if __name__ == '__main__':
