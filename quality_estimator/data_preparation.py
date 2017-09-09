@@ -66,14 +66,14 @@ def create_dataset(filtered):
     return dialogs, labels
 
 
-def make_word_ix(dialogs):
+def make_word_ix(dialogs, start_ix=0):
     word_ix = {}
     vocab = set()
     for d in dialogs:
         for sent in d:
             for w in sent[1]:
                 vocab.add(w)
-    ix = 0
+    ix = start_ix
     for w in vocab:
         word_ix[w] = ix
         ix += 1
@@ -129,6 +129,83 @@ def oversample(dialogs, labels):
     return X_oversampled, y_oversampled
 
 
+def create_sentence_evaluation_dataset(dialogs, word_ix, user_bot_ix, current_ix):
+    sents = []
+    for d in dialogs:
+        for ind, sent in enumerate(d):
+            if len(sent) > 2 and sent[2] > 0:
+                sent_context = d[ind-5:ind]
+                sent_row = (sent_context, sent, sent[2])
+                sents.append(sent_row)
+    sentences_matrix = get_sentences_matrix(sents, word_ix, user_bot_ix, current_ix)
+    return sentences_matrix
+
+
+# [3xSj], 1 - word_id, 2 - user_bot, 3 - current_utt
+def get_sentences_matrix(sents, word_ix, user_bot_ix, current_ix):
+    sent_mats = []
+    labels = []
+    for sent_row in sents:
+        sent_context, sent, label = sent_row
+        labels.append(label)
+        sent_mat = get_sent_mat(sent, word_ix, user_bot_ix, current_ix, 'CUR')
+        sent_mats_context = [get_sent_mat(sent_c, word_ix, user_bot_ix, current_ix, 'NOT_CUR') for sent_c in sent_context]
+        if sent_mats_context:
+            sent_mats_context = np.hstack(sent_mats_context)
+            sent_mat = np.hstack([sent_mats_context, sent_mat])
+        sent_mat_result = np.zeros((3, 50), dtype=np.int64)
+        min_shape = min(50, sent_mat.shape[1])
+        sent_mat_result[:, :min_shape] = sent_mat[:, :min_shape]
+        sent_mats.append(sent_mat_result)
+    sent_mats = np.array(sent_mats)
+    labels = np.array(labels)
+    print(sent_mats.shape, labels.shape)
+    return sent_mats, labels
+    # padding_idx=0
+
+
+def get_word_ids(words, word_ix):
+    return np.array([word_ix[word] for word in words])
+
+
+def get_sent_mat(sent, word_ix, user_bot_ix, current_ix, is_current='NOT_CUR'):
+    user_bot_id = user_bot_ix[sent[0]]
+    current_id = current_ix[is_current]
+
+    words_ids = get_word_ids(sent[1], word_ix)
+    user_bot_ids = np.repeat(user_bot_id, len(sent[1]))
+    current_ids = np.repeat(current_id, len(sent[1]))
+
+    sent_mat = np.vstack((words_ids, user_bot_ids, current_ids))
+    return sent_mat
+
+
+def main_sent():
+    with open("data/train_full.json") as f:
+        dialogs = json.load(f)
+
+    filtered = preserve_good_data(dialogs)
+
+    dialogs, labels = create_dataset(filtered)
+
+    print(dialogs[:3])
+
+    user_bot_ix = {'user': 1, 'bot': 2, '<SOD>': 3, '<EOD>': 4}
+    current_ix = {'NOT_CUR': 1, 'CUR': 2}
+    word_ix = make_word_ix(dialogs, 1)
+
+    sent_mats, labels = create_sentence_evaluation_dataset(dialogs, word_ix, user_bot_ix, current_ix)
+
+    print(sent_mats[:2], labels[:2])
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        sent_mats, labels, test_size=0.15, random_state=42
+    )
+
+    with open('data/sent_data.pickle', 'wb') as f:
+        pickle.dump([X_train, X_test, y_train, y_test], f)
+
+
 def main():
     with open("data/train_full.json") as f:
         dialogs = json.load(f)
@@ -137,7 +214,10 @@ def main():
 
     dialogs, labels = create_dataset(filtered)
 
+    print(dialogs[:10])
+
     user_bot_ix = {'user': 0, 'bot': 1, '<SOD>': 2, '<EOD>': 3}
+    current_ix = {'NOT_CUR': 0, 'CUR': 1}
     word_ix = make_word_ix(dialogs)
 
     dialogs_vectored = make_vectored_dialogs(dialogs, word_ix, user_bot_ix)
@@ -149,12 +229,12 @@ def main():
     X_over, y_over = oversample(X_train, y_train)
     X_over_shuffle, y_over_shuffle = shuffle(X_over, y_over, random_state=42)
 
-    print(X_over_shuffle[:5], y_over_shuffle[:5])
+    # print(X_over_shuffle[:5], y_over_shuffle[:5])
 
     with open('data/dilogs_and_labels.pickle', 'wb') as f:
         pickle.dump([X_over_shuffle, X_test, y_over_shuffle, y_test], f)
 
 
 if __name__ == '__main__':
-    main()
+    main_sent()
 

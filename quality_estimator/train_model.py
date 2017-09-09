@@ -122,7 +122,7 @@ def main():
             avg_loss += loss.data[0]
             loss.backward()
             optimizer.step()
-        print("Loss: {}".format(avg_loss / len(X_train)))
+        print("Loss: {}".format(avg_loss / len(dialogs)))
 
         measure_model_quality(model, loss_function, X_test, y_test)
 
