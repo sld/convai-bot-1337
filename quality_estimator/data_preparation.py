@@ -1,6 +1,10 @@
 import json
 import pickle
+import numpy as np
 from nltk import word_tokenize
+from collections import Counter, defaultdict
+from sklearn.utils import shuffle
+from sklearn.model_selection import train_test_split
 
 
 def get_label(val):
@@ -106,6 +110,25 @@ def make_dialog_sent_eval_labels(dialogs):
     return dialogs_labels
 
 
+def oversample(dialogs, labels):
+    labels_cnt = Counter(labels)
+    grouped = defaultdict(list)
+    for ind, label in enumerate(labels):
+        grouped[label].append(dialogs[ind])
+    grouped[1] = np.repeat(grouped[1], labels_cnt[0] // labels_cnt[1])
+    grouped[2] = np.repeat(grouped[2], labels_cnt[0] // labels_cnt[2])
+    y_oversampled = np.repeat(0, len(grouped[0]))
+    y_oversampled = np.concatenate([y_oversampled, np.repeat(1, len(grouped[1]))])
+    y_oversampled = np.concatenate([y_oversampled, np.repeat(2, len(grouped[2]))])
+
+    X_oversampled = np.concatenate([grouped[0], grouped[1], grouped[2]])
+
+    labels_cnt = Counter(y_oversampled)
+    print('After oversampling: {}'.format(labels_cnt))
+
+    return X_oversampled, y_oversampled
+
+
 def main():
     with open("data/train_full.json") as f:
         dialogs = json.load(f)
@@ -119,14 +142,17 @@ def main():
 
     dialogs_vectored = make_vectored_dialogs(dialogs, word_ix, user_bot_ix)
 
-    sent_eval_labels = make_dialog_sent_eval_labels(dialogs)
+    X_train, X_test, y_train, y_test = train_test_split(
+        dialogs_vectored, labels, test_size=0.15, random_state=42
+    )
+
+    X_over, y_over = oversample(X_train, y_train)
+    X_over_shuffle, y_over_shuffle = shuffle(X_over, y_over, random_state=42)
+
+    print(X_over_shuffle[:5], y_over_shuffle[:5])
 
     with open('data/dilogs_and_labels.pickle', 'wb') as f:
-        pickle.dump([dialogs_vectored, labels], f)
-
-    with open('data/sent_eval_labels.pickle', 'wb') as f:
-        pickle.dump(sent_eval_labels, f)
-
+        pickle.dump([X_over_shuffle, X_test, y_over_shuffle, y_test], f)
 
 
 if __name__ == '__main__':
