@@ -106,7 +106,7 @@ def main():
 
     for epoch in range(10):
         avg_loss = 0
-        for ind, dialog in tqdm(enumerate(X_train[:100])):
+        for ind, dialog in tqdm(enumerate(X_train)):
             model.zero_grad()
             model.hidden = model.init_hidden()
 
