@@ -85,7 +85,7 @@ def measure_model_quality(model, loss_function, test_loader):
         top_n, top_i = out.data.topk(1)
         y_pred += top_i.resize_(top_i.size()[0]).tolist()
 
-    print("Test loss: {}".format(avg_loss))
+    print("Test loss: {}".format(avg_loss / len(test_loader.dataset)))
 
     y_test = test_loader.dataset.target_tensor.tolist()
     print(classification_report(y_test, y_pred))
