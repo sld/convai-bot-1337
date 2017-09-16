@@ -14,3 +14,4 @@ classifiers/squad/train-v1.1.json
 classifiers/squad/questions.txt
 *.tar.gz
 facebook-news/
+*.pickle
