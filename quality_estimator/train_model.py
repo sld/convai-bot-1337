@@ -6,48 +6,7 @@ from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, f1_score
 from collections import Counter
-
-
-class Model(nn.Module):
-    def __init__(self):
-        super(Model, self).__init__()
-
-        # Bx50
-        self.word_embeddings = nn.Embedding(10037, 50)
-        # Bx10
-        self.user_bot_embeddings = nn.Embedding(4, 10)
-        self.rnn = nn.GRU(60, 128, 1)
-        self.linear = nn.Linear(128, 3)
-        self.softmax = nn.LogSoftmax()
-
-        self.hidden = self.init_hidden()
-
-    def init_hidden(self):
-        return Variable(torch.zeros(1, 1, 128))
-
-    # input => Bx2xN, B - sentence len
-    def forward(self, input, calc_softmax=False):
-        word_emb = self.word_embeddings(input[:, 0, :])
-        user_bot_emb = self.user_bot_embeddings(input[:, 1, :])
-        input_combined = torch.cat((word_emb, user_bot_emb), 2)
-        input_combined = input_combined.view(input_combined.size()[1], 1, input_combined.size()[-1])
-
-        rnn_out, self.hidden = self.rnn(input_combined, self.hidden)
-        output = self.linear(self.hidden).view(1, 3)
-
-        if calc_softmax:
-            probs = self.softmax(output)
-            return self.hidden, probs
-        else:
-            return self.hidden, output
-
-    def save(self, path='data/models/dialog/model.pytorch'):
-        torch.save(self, path)
-        return True
-
-    @staticmethod
-    def load(self, path='data/models/dialog/model.pytorch'):
-        return torch.load(path)
+from models import DialogModel
 
 
 def load_dialogs_and_labels(filename):
@@ -121,7 +80,7 @@ def main():
 
     y_train = Variable(torch.LongTensor(y_train))
 
-    model = Model()
+    model = DialogModel()
     loss_function = nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters())
     prev_best_f1 = 0

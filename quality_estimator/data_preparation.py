@@ -54,9 +54,7 @@ def create_dataset(filtered):
 
         dialog = [('<SOD>', ['<SOD>'])]
         for r in d['thread']:
-            words = [w.lower() for w in word_tokenize(r['text'])]
-            words.insert(0, '<BOS>')
-            words.append('<EOS>')
+            normalize_words_in_text(r['text'])
             if r['userId'] == user:
                 dialog.append(('user', words, r['evaluation']))
             else:
@@ -67,6 +65,14 @@ def create_dataset(filtered):
     return dialogs, labels
 
 
+def normalize_words_in_text(text):
+    words = [w.lower() for w in word_tokenize(text)]
+    words.insert(0, '<BOS>')
+    words.append('<EOS>')
+    return words
+
+
+# TODO: Добавить unknown токен!
 def make_word_ix(dialogs, start_ix=0):
     word_ix = {}
     vocab = set()
@@ -75,7 +81,7 @@ def make_word_ix(dialogs, start_ix=0):
             for w in sent[1]:
                 vocab.add(w)
     ix = start_ix
-    for w in vocab:
+    for w in sorted(vocab):
         word_ix[w] = ix
         ix += 1
     return word_ix
@@ -90,7 +96,11 @@ def make_vectored_dialogs(dialogs, word_ix, user_bot_ix):
             sent_bot_ix = []
             sent_word_ix = []
             for w in sent[1]:
-                sent_word_ix.append(word_ix[w])
+                if w in word_ix:
+                    sent_word_ix.append(word_ix[w])
+                else:
+                    print('WARNING: UNK WORD')
+                    sent_word_ix.append(0)
                 sent_bot_ix.append(user_bot_ix[sent[0]])
             if sent_bot_ix:
                 sent_vec = [sent_word_ix, sent_bot_ix]
@@ -182,7 +192,7 @@ def get_sent_mat(sent, word_ix, user_bot_ix, current_ix, is_current='NOT_CUR'):
     return sent_mat
 
 
-def main_sent():
+def base_main():
     with open("data/train_full.json") as f:
         dialogs = json.load(f)
 
@@ -195,6 +205,12 @@ def main_sent():
     user_bot_ix = {'user': 1, 'bot': 2, '<SOD>': 3, '<EOD>': 4}
     current_ix = {'NOT_CUR': 1, 'CUR': 2}
     word_ix = make_word_ix(dialogs, 1)
+
+    return user_bot_ix, current_ix, word_ix, dialogs, labels
+
+
+def main_sent():
+    user_bot_ix, current_ix, word_ix, dialogs, labels = base_main()
 
     sent_mats, labels = create_sentence_evaluation_dataset(dialogs, word_ix, user_bot_ix, current_ix)
 
@@ -210,17 +226,7 @@ def main_sent():
 
 
 def main(with_oversampling=False):
-    with open("data/train_full.json") as f:
-        dialogs = json.load(f)
-
-    filtered = preserve_good_data(dialogs)
-
-    dialogs, labels = create_dataset(filtered)
-
-    print(dialogs[:2])
-
-    user_bot_ix = {'user': 0, 'bot': 1, '<SOD>': 2, '<EOD>': 3}
-    word_ix = make_word_ix(dialogs)
+    user_bot_ix, _, word_ix, dialogs, labels = base_main()
 
     dialogs_vectored = make_vectored_dialogs(dialogs, word_ix, user_bot_ix)
 
