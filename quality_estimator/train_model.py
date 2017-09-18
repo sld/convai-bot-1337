@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, f1_score
 from collections import Counter
 
 
@@ -41,10 +41,23 @@ class Model(nn.Module):
         else:
             return self.hidden, output
 
+    def save(self, path='data/models/dialog/model.pytorch'):
+        torch.save(self, path)
+        return True
+
+    @staticmethod
+    def load(self, path='data/models/dialog/model.pytorch'):
+        return torch.load(path)
+
 
 def load_dialogs_and_labels(filename):
     with open(filename, 'rb') as f:
         X_train, X_test, y_train, y_test = pickle.load(f)
+
+    # X_train = X_train[:100]
+    # X_test = X_test[:100]
+    # y_train = y_train[:100]
+    # y_test = y_test[:100]
 
     train_dialogs = []
     test_dialogs = []
@@ -70,7 +83,7 @@ def load_sent_labels(filename):
     return labels
 
 
-def measure_model_quality(model, loss_function, X_test, y_test):
+def measure_model_quality(model, loss_function, X_test, y_test, prev_best_f1=0):
     avg_loss = 0
     y_pred = []
     y_test_for_loss = Variable(torch.LongTensor(y_test))
@@ -91,18 +104,27 @@ def measure_model_quality(model, loss_function, X_test, y_test):
         avg_loss += loss.data[0]
     avg_loss = avg_loss / len(X_test)
     print("Test loss: {}".format(avg_loss))
+    f1 = f1_score(y_test, y_pred, average='weighted')
+    print("Test F1: {}".format(f1))
 
     print(classification_report(y_test, y_pred))
 
+    if f1 >= prev_best_f1:
+        prev_best_f1 = f1
+        model.save()
+
+    return prev_best_f1
+
 
 def main():
-    X_train, X_test, y_train, y_test = load_dialogs_and_labels('data/dilogs_and_labels.pickle')
+    X_train, X_test, y_train, y_test = load_dialogs_and_labels('data/dialogs_and_labels.pickle')
 
     y_train = Variable(torch.LongTensor(y_train))
 
     model = Model()
     loss_function = nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters())
+    prev_best_f1 = 0
 
     for epoch in range(10):
         avg_loss = 0
@@ -122,9 +144,9 @@ def main():
             avg_loss += loss.data[0]
             loss.backward()
             optimizer.step()
-        print("Loss: {}".format(avg_loss / len(dialogs)))
+        print("Loss: {}".format(avg_loss / len(X_train)))
 
-        measure_model_quality(model, loss_function, X_test, y_test)
+        prev_best_f1 = measure_model_quality(model, loss_function, X_test, y_test, prev_best_f1)
 
 
 if __name__ == '__main__':

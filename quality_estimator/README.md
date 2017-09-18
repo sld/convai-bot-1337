@@ -1,13 +1,54 @@
-1865it [35:28,  1.51it/s]
-Loss: 0.628062629457754
-330it [00:09, 36.00it/s]
-Test loss: 0.7982031614801874
-             precision    recall  f1-score   support
+1. Данные для обучения/вывода
+2. Скрипт для обучения
+3. Скрипт для вывода
+4. Небольшой рефакторинг
 
-          0       0.75      0.95      0.84       240
-          1       0.00      0.00      0.00        46
-          2       0.31      0.20      0.25        44
 
-avg / total       0.59      0.72      0.64       330
+1. Данные для обучения/вывода
 
-GRU + additional sentence level loss
+- data_preparation.py - скрипт для предобработки данных
+  Вход: json от convai: [dialogs]
+    [
+      {
+        evaluation: [u1 (userId, quality), u2 (userId, quality)],
+        users: [u1 (id, userType), u2 (id, userType)],
+        thread: [text (text, userId, evaluation)]
+      }
+    ]
+
+  -- main(with_oversampling). Выход: [X, X_test, y, y_test]
+     Есть вариант с oversampling'ом.
+
+    ```
+      X:
+
+      [
+        [  # D1
+          [
+            [5392], [2] # S1
+          ],
+          [
+            [8132, 2601, 9974, 7521], [0, 0, 0, 0] # S2
+          ]
+        ],
+        [...] # D2
+      ]
+
+      y: [label1, label2]
+    ```
+
+  -- main_sent(). Выход: [X, X_test, y, y_test]
+
+    ```
+      X shape: (5978, 3, 50)
+      y shape: (5978,)
+    ```
+
+
+2. Скрипт для обучения
+
+  - train_model.py
+  После каждой эпохи сохраняет лучшую модель в data/models/dialog/model.pytorch
+
+  - train_model_sent.py
+  После каждой эпохи сохраняет лучшую модель в data/models/sentence/model.pytorch

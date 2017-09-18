@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, f1_score
 from collections import Counter
 
 
@@ -41,6 +41,14 @@ class Model(nn.Module):
         else:
             return self.hidden, output
 
+    def save(self, path='data/models/sentence/model.pytorch'):
+        torch.save(self, path)
+        return True
+
+    @staticmethod
+    def load(self, path='data/models/sentence/model.pytorch'):
+        return torch.load(path)
+
 
 def load_dialogs_and_labels(filename):
     with open(filename, 'rb') as f:
@@ -71,7 +79,7 @@ def load_sent_labels(filename):
     return labels
 
 
-def measure_model_quality(model, loss_function, test_loader):
+def measure_model_quality(model, loss_function, test_loader, prev_best_f1=0):
     avg_loss = 0
     y_pred = []
     for batch_idx, (data, target) in tqdm(enumerate(test_loader)):
@@ -86,9 +94,17 @@ def measure_model_quality(model, loss_function, test_loader):
         y_pred += top_i.resize_(top_i.size()[0]).tolist()
 
     print("Test loss: {}".format(avg_loss / len(test_loader.dataset)))
+    f1 = f1_score(y_test, y_pred, average='weighted')
+    print("Test F1: {}".format(f1))
 
     y_test = test_loader.dataset.target_tensor.tolist()
     print(classification_report(y_test, y_pred))
+
+    if f1 >= prev_best_f1:
+        prev_best_f1 = f1
+        model.save()
+
+    return prev_best_f1
 
 
 def main():
@@ -97,7 +113,7 @@ def main():
     model = Model()
     loss_function = nn.NLLLoss()
     optimizer = torch.optim.Adam(model.parameters())
-
+    prev_best_f1 = 0
     for epoch in range(10):
         avg_loss = 0
         for batch_idx, (data, target) in tqdm(enumerate(train_loader)):
@@ -112,7 +128,7 @@ def main():
             optimizer.step()
         print("Loss: {}".format(avg_loss / len(train_loader.dataset)))
 
-        measure_model_quality(model, loss_function, test_loader)
+        prev_best_f1 = measure_model_quality(model, loss_function, test_loader, prev_best_f1)
 
 
 if __name__ == '__main__':

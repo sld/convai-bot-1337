@@ -1,6 +1,7 @@
 import json
 import pickle
 import numpy as np
+from sys import argv
 from nltk import word_tokenize
 from collections import Counter, defaultdict
 from sklearn.utils import shuffle
@@ -80,6 +81,7 @@ def make_word_ix(dialogs, start_ix=0):
     return word_ix
 
 
+# [ [ [words 1xS], [bots 1xS] ] ]
 def make_vectored_dialogs(dialogs, word_ix, user_bot_ix):
     dialogs_vecs = []
     for d in dialogs:
@@ -92,7 +94,7 @@ def make_vectored_dialogs(dialogs, word_ix, user_bot_ix):
                 sent_bot_ix.append(user_bot_ix[sent[0]])
             if sent_bot_ix:
                 sent_vec = [sent_word_ix, sent_bot_ix]
-                d_vecs.append([sent_vec])
+                d_vecs.append(sent_vec)
         dialogs_vecs.append(d_vecs)
     return dialogs_vecs
 
@@ -188,7 +190,7 @@ def main_sent():
 
     dialogs, labels = create_dataset(filtered)
 
-    print(dialogs[:3])
+    print(dialogs[:2])
 
     user_bot_ix = {'user': 1, 'bot': 2, '<SOD>': 3, '<EOD>': 4}
     current_ix = {'NOT_CUR': 1, 'CUR': 2}
@@ -196,17 +198,18 @@ def main_sent():
 
     sent_mats, labels = create_sentence_evaluation_dataset(dialogs, word_ix, user_bot_ix, current_ix)
 
-    print(sent_mats[:2], labels[:2])
-
     X_train, X_test, y_train, y_test = train_test_split(
         sent_mats, labels, test_size=0.15, random_state=42
     )
+
+    print("X_train: {}; Shape: {}".format(X_train[:2], X_train.shape))
+    print("y_train: {}; Shape: {}".format(y_train[:2], y_train.shape))
 
     with open('data/sent_data.pickle', 'wb') as f:
         pickle.dump([X_train, X_test, y_train, y_test], f)
 
 
-def main():
+def main(with_oversampling=False):
     with open("data/train_full.json") as f:
         dialogs = json.load(f)
 
@@ -214,10 +217,9 @@ def main():
 
     dialogs, labels = create_dataset(filtered)
 
-    print(dialogs[:10])
+    print(dialogs[:2])
 
     user_bot_ix = {'user': 0, 'bot': 1, '<SOD>': 2, '<EOD>': 3}
-    current_ix = {'NOT_CUR': 0, 'CUR': 1}
     word_ix = make_word_ix(dialogs)
 
     dialogs_vectored = make_vectored_dialogs(dialogs, word_ix, user_bot_ix)
@@ -225,16 +227,20 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(
         dialogs_vectored, labels, test_size=0.15, random_state=42
     )
+    print("X_train: {}".format(X_train[:2]))
+    print("y_train: {}".format(y_train[:2]))
 
-    X_over, y_over = oversample(X_train, y_train)
-    X_over_shuffle, y_over_shuffle = shuffle(X_over, y_over, random_state=42)
+    if with_oversampling:
+        X_train, y_train = oversample(X_train, y_train)
+        X_train, y_train = shuffle(X_train, y_train, random_state=42)
 
-    # print(X_over_shuffle[:5], y_over_shuffle[:5])
-
-    with open('data/dilogs_and_labels.pickle', 'wb') as f:
-        pickle.dump([X_over_shuffle, X_test, y_over_shuffle, y_test], f)
+    with open('data/dialogs_and_labels.pickle', 'wb') as f:
+        pickle.dump([X_train, X_test, y_train, y_test], f)
 
 
 if __name__ == '__main__':
-    main_sent()
+    if argv[1] == 'sent':
+        main_sent()
+    else:
+        main()
 
