@@ -21,9 +21,6 @@ class Model(nn.Module):
         self.linear = nn.Linear(128, 3)
         self.softmax = nn.LogSoftmax()
 
-    def init_hidden(self, batch_size):
-        return Variable(torch.zeros(50, batch_size, 128))
-
     # input => Bx2xN, B - sentence len
     def forward(self, input, calc_softmax=False):
         word_emb = self.word_embeddings(input[:, 0, :])
@@ -85,7 +82,7 @@ def measure_model_quality(model, loss_function, test_loader, prev_best_f1=0):
     for batch_idx, (data, target) in tqdm(enumerate(test_loader)):
         data, target = Variable(data), Variable(target)
         model.zero_grad()
-        model.hidden = model.init_hidden(target.size()[0])
+        model.hidden = Variable(torch.zeros(50, target.size()[0], 128))
         hidden, out = model(data, True)
         loss = loss_function(out, target)
         avg_loss += loss.data[0]
@@ -109,19 +106,25 @@ def measure_model_quality(model, loss_function, test_loader, prev_best_f1=0):
     return prev_best_f1
 
 
+# NOTE: For some reason it is not working with cuda: RuntimeError: Expected hidden size (1, 16, 128), got (50, 16, 128)
 def main():
     train_loader, test_loader = load_dialogs_and_labels('data/sent_data.pickle')
 
     model = Model()
     loss_function = nn.NLLLoss()
+    # model.cuda()
+    # loss_function.cuda()
     optimizer = torch.optim.Adam(model.parameters())
     prev_best_f1 = 0
     for epoch in range(10):
         avg_loss = 0
         for batch_idx, (data, target) in tqdm(enumerate(train_loader)):
             data, target = Variable(data), Variable(target)
+            # data, target = data.cuda(), target.cuda()
             model.zero_grad()
-            model.hidden = model.init_hidden(target.size()[0])
+            model.hidden = Variable(torch.zeros(50, target.size()[0], 128))
+            # model.hidden = model.hidden.cuda()
+
             hidden, out = model(data, True)
 
             loss = loss_function(out, target)
