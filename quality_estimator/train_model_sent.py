@@ -94,10 +94,12 @@ def measure_model_quality(model, loss_function, test_loader, prev_best_f1=0):
         y_pred += top_i.resize_(top_i.size()[0]).tolist()
 
     print("Test loss: {}".format(avg_loss / len(test_loader.dataset)))
+
+    y_test = test_loader.dataset.target_tensor.tolist()
+
     f1 = f1_score(y_test, y_pred, average='weighted')
     print("Test F1: {}".format(f1))
 
-    y_test = test_loader.dataset.target_tensor.tolist()
     print(classification_report(y_test, y_pred))
 
     if f1 >= prev_best_f1:
