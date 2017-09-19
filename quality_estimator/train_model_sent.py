@@ -5,41 +5,9 @@ import torch.nn as nn
 from torch.autograd import Variable
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, f1_score
 from collections import Counter
-
-
-class Model(nn.Module):
-    def __init__(self):
-        super(Model, self).__init__()
-        # Bx50
-        self.word_embeddings = nn.Embedding(11000, 50, padding_idx=0)
-        # Bx10
-        self.user_bot_embeddings = nn.Embedding(5, 10, padding_idx=0)
-        self.cur_embeddings = nn.Embedding(3, 10, padding_idx=0)
-        self.rnn = nn.GRU(70, 128, 1, batch_first=True)
-        self.linear = nn.Linear(128, 3)
-        self.softmax = nn.LogSoftmax()
-
-    def init_hidden(self, batch_size):
-        return Variable(torch.zeros(50, batch_size, 128))
-
-    # input => Bx2xN, B - sentence len
-    def forward(self, input, calc_softmax=False):
-        word_emb = self.word_embeddings(input[:, 0, :])
-        user_bot_emb = self.user_bot_embeddings(input[:, 1, :])
-        cur_emb = self.cur_embeddings(input[:, 2, :])
-
-        input_combined = torch.cat((word_emb, user_bot_emb, cur_emb), 2)
-
-        rnn_out, self.hidden = self.rnn(input_combined, self.hidden)
-        output = self.linear(self.hidden).view(-1, 3)
-
-        if calc_softmax:
-            probs = self.softmax(output)
-            return self.hidden, probs
-        else:
-            return self.hidden, output
+from models import UtteranceModel
 
 
 def load_dialogs_and_labels(filename):
@@ -71,14 +39,19 @@ def load_sent_labels(filename):
     return labels
 
 
-def measure_model_quality(model, loss_function, test_loader):
+def forward_pass_sent(model, data):
+    model.zero_grad()
+    model.hidden = Variable(torch.zeros(50, 1, 128))
+    hidden, out = model(data, True)
+    return out
+
+
+def measure_model_quality(model, loss_function, test_loader, prev_best_f1=0):
     avg_loss = 0
     y_pred = []
     for batch_idx, (data, target) in tqdm(enumerate(test_loader)):
         data, target = Variable(data), Variable(target)
-        model.zero_grad()
-        model.hidden = model.init_hidden(target.size()[0])
-        hidden, out = model(data, True)
+        out = forward_pass_sent(model, data)
         loss = loss_function(out, target)
         avg_loss += loss.data[0]
 
@@ -88,31 +61,41 @@ def measure_model_quality(model, loss_function, test_loader):
     print("Test loss: {}".format(avg_loss / len(test_loader.dataset)))
 
     y_test = test_loader.dataset.target_tensor.tolist()
+
+    f1 = f1_score(y_test, y_pred, average='weighted')
+    print("Test F1: {}".format(f1))
+
     print(classification_report(y_test, y_pred))
 
+    if f1 >= prev_best_f1:
+        prev_best_f1 = f1
+        model.save()
 
+    return prev_best_f1
+
+
+# NOTE: For some reason it is not working with cuda: RuntimeError: Expected hidden size (1, 16, 128), got (50, 16, 128)
 def main():
     train_loader, test_loader = load_dialogs_and_labels('data/sent_data.pickle')
 
-    model = Model()
+    model = UtteranceModel()
     loss_function = nn.NLLLoss()
+    # model.cuda()
+    # loss_function.cuda()
     optimizer = torch.optim.Adam(model.parameters())
-
+    prev_best_f1 = 0
     for epoch in range(10):
         avg_loss = 0
         for batch_idx, (data, target) in tqdm(enumerate(train_loader)):
             data, target = Variable(data), Variable(target)
-            model.zero_grad()
-            model.hidden = model.init_hidden(target.size()[0])
-            hidden, out = model(data, True)
-
+            out = forward_pass_sent(model, data)
             loss = loss_function(out, target)
             avg_loss += loss.data[0]
             loss.backward()
             optimizer.step()
         print("Loss: {}".format(avg_loss / len(train_loader.dataset)))
 
-        measure_model_quality(model, loss_function, test_loader)
+        prev_best_f1 = measure_model_quality(model, loss_function, test_loader, prev_best_f1)
 
 
 if __name__ == '__main__':
