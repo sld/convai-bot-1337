@@ -1,5 +1,11 @@
 # Описание
 
+## Окружение
+
+- python 3.6.2
+- requirements.txt
+- requirements_server.txt
+
 ## 1. Данные для обучения/вывода
 
 - data_preparation.py - скрипт для предобработки данных
