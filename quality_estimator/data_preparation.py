@@ -54,7 +54,7 @@ def create_dataset(filtered):
 
         dialog = [('<SOD>', ['<SOD>'])]
         for r in d['thread']:
-            normalize_words_in_text(r['text'])
+            words = normalize_words_in_text(r['text'])
             if r['userId'] == user:
                 dialog.append(('user', words, r['evaluation']))
             else:
@@ -99,7 +99,7 @@ def make_vectored_dialogs(dialogs, word_ix, user_bot_ix):
                 if w in word_ix:
                     sent_word_ix.append(word_ix[w])
                 else:
-                    print('WARNING: UNK WORD')
+                    print('WARNING: UNK WORD ({})'.format(w))
                     sent_word_ix.append(0)
                 sent_bot_ix.append(user_bot_ix[sent[0]])
             if sent_bot_ix:
@@ -145,9 +145,10 @@ def create_sentence_evaluation_dataset(dialogs, word_ix, user_bot_ix, current_ix
     sents = []
     for d in dialogs:
         for ind, sent in enumerate(d):
-            if len(sent) > 2 and sent[2] > 0:
+            label = sent[2]
+            if len(sent) > 2 and label > 0:
                 sent_context = d[ind-5:ind]
-                sent_row = (sent_context, sent, sent[2])
+                sent_row = (sent_context, sent, label)
                 sents.append(sent_row)
     sentences_matrix = get_sentences_matrix(sents, word_ix, user_bot_ix, current_ix)
     return sentences_matrix
@@ -199,8 +200,6 @@ def base_main():
     filtered = preserve_good_data(dialogs)
 
     dialogs, labels = create_dataset(filtered)
-
-    print(dialogs[:2])
 
     user_bot_ix = {'user': 1, 'bot': 2, '<SOD>': 3, '<EOD>': 4}
     current_ix = {'NOT_CUR': 1, 'CUR': 2}

@@ -9,6 +9,16 @@ from collections import Counter
 from models import DialogModel
 
 
+def convert_to_torch_format(vectored_dialogs):
+    dialogs = []
+    for dialog_vec in vectored_dialogs:
+        dialog = []
+        for sent_vec in dialog_vec:
+            dialog.append(torch.LongTensor(sent_vec).view(1, 2, -1))
+        dialogs.append(dialog)
+    return dialogs
+
+
 def load_dialogs_and_labels(filename):
     with open(filename, 'rb') as f:
         X_train, X_test, y_train, y_test = pickle.load(f)
@@ -18,21 +28,10 @@ def load_dialogs_and_labels(filename):
     # y_train = y_train[:100]
     # y_test = y_test[:100]
 
-    train_dialogs = []
-    test_dialogs = []
-    for dialog_vec in X_train:
-        dialog = []
-        for sent_vec in dialog_vec:
-            dialog.append(torch.LongTensor(sent_vec).view(1, 2, -1))
-        train_dialogs.append(dialog)
+    X_train = convert_to_torch_format(X_train)
+    X_test = convert_to_torch_format(X_test)
 
-    for dialog_vec in X_test:
-        dialog = []
-        for sent_vec in dialog_vec:
-            dialog.append(torch.LongTensor(sent_vec).view(1, 2, -1))
-        test_dialogs.append(dialog)
-
-    return train_dialogs, test_dialogs, y_train, y_test
+    return X_train, X_test, y_train, y_test
 
 
 def load_sent_labels(filename):
@@ -47,14 +46,7 @@ def measure_model_quality(model, loss_function, X_test, y_test, prev_best_f1=0):
     y_pred = []
     y_test_for_loss = Variable(torch.LongTensor(y_test))
     for ind, dialog in tqdm(enumerate(X_test)):
-        model.zero_grad()
-        model.hidden = model.init_hidden()
-        for sent in dialog[:-1]:
-            input = Variable(torch.LongTensor(sent))
-            hidden, out = model(input)
-        input = Variable(torch.LongTensor(dialog[-1]))
-        hidden, out = model(input, True)
-
+        out = forward_pass(model, dialog)
         top_n, top_i = out.data.topk(1)
         y_pred.append(top_i[0][0])
 
@@ -88,16 +80,7 @@ def main():
     for epoch in range(10):
         avg_loss = 0
         for ind, dialog in tqdm(enumerate(X_train)):
-            model.zero_grad()
-            model.hidden = model.init_hidden()
-
-            for j, sent in enumerate(dialog[:-1]):
-                model.zero_grad()
-                input = Variable(torch.LongTensor(sent))
-                hidden, out = model(input)
-
-            input = Variable(torch.LongTensor(dialog[-1]))
-            hidden, out = model(input, True)
+            out = forward_pass(model, dialog)
 
             loss = loss_function(out, y_train[ind])
             avg_loss += loss.data[0]
@@ -106,6 +89,16 @@ def main():
         print("Loss: {}".format(avg_loss / len(X_train)))
 
         prev_best_f1 = measure_model_quality(model, loss_function, X_test, y_test, prev_best_f1)
+
+
+def forward_pass(model, dialog):
+    model.hidden = model.init_hidden()
+    for sent in dialog[:-1]:
+        input = Variable(torch.LongTensor(sent))
+        hidden, out = model(input)
+    input = Variable(torch.LongTensor(dialog[-1]))
+    hidden, out = model(input, True)
+    return out
 
 
 if __name__ == '__main__':
