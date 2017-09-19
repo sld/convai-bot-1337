@@ -145,8 +145,8 @@ def create_sentence_evaluation_dataset(dialogs, word_ix, user_bot_ix, current_ix
     sents = []
     for d in dialogs:
         for ind, sent in enumerate(d):
-            label = sent[2]
-            if len(sent) > 2 and label > 0:
+            if len(sent) > 2 and sent[2] > 0:
+                label = sent[2]
                 sent_context = d[ind-5:ind]
                 sent_row = (sent_context, sent, label)
                 sents.append(sent_row)

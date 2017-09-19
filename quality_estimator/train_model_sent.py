@@ -39,14 +39,19 @@ def load_sent_labels(filename):
     return labels
 
 
+def forward_pass_sent(model, data):
+    model.zero_grad()
+    model.hidden = Variable(torch.zeros(50, 1, 128))
+    hidden, out = model(data, True)
+    return out
+
+
 def measure_model_quality(model, loss_function, test_loader, prev_best_f1=0):
     avg_loss = 0
     y_pred = []
     for batch_idx, (data, target) in tqdm(enumerate(test_loader)):
         data, target = Variable(data), Variable(target)
-        model.zero_grad()
-        model.hidden = Variable(torch.zeros(50, target.size()[0], 128))
-        hidden, out = model(data, True)
+        out = forward_pass_sent(model, data)
         loss = loss_function(out, target)
         avg_loss += loss.data[0]
 
@@ -83,13 +88,7 @@ def main():
         avg_loss = 0
         for batch_idx, (data, target) in tqdm(enumerate(train_loader)):
             data, target = Variable(data), Variable(target)
-            # data, target = data.cuda(), target.cuda()
-            model.zero_grad()
-            model.hidden = Variable(torch.zeros(50, target.size()[0], 128))
-            # model.hidden = model.hidden.cuda()
-
-            hidden, out = model(data, True)
-
+            out = forward_pass_sent(model, data)
             loss = loss_function(out, target)
             avg_loss += loss.data[0]
             loss.backward()

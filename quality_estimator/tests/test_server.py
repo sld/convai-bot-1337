@@ -27,7 +27,7 @@ def utterance_quality_test(url):
 
     r = requests.get(url, json=data)
     print(r.json())
-    assert r.json()['quality'] > 0
+    assert r.json()['quality_label'] in [1, 2]
 
 
 if __name__ == '__main__':
