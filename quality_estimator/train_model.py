@@ -1,6 +1,7 @@
 import pickle
 import torch
 import torch.nn as nn
+from sys import argv
 from torch.autograd import Variable
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
@@ -41,7 +42,7 @@ def load_sent_labels(filename):
     return labels
 
 
-def measure_model_quality(model, loss_function, X_test, y_test, prev_best_f1=0):
+def measure_model_quality(model, loss_function, X_test, y_test, prev_best_f1=0, with_save=True):
     avg_loss = 0
     y_pred = []
     y_test_for_loss = Variable(torch.LongTensor(y_test))
@@ -55,12 +56,13 @@ def measure_model_quality(model, loss_function, X_test, y_test, prev_best_f1=0):
         avg_loss += loss.data[0]
     avg_loss = avg_loss / len(X_test)
     print("Test loss: {}".format(avg_loss))
-    f1 = f1_score(y_test, y_pred, average='weighted')
-    print("Test F1: {}".format(f1))
+    f1 = f1_score(y_test, y_pred, average=None)[1]
+    print("Test F1 label X: {}".format(f1))
 
     print(classification_report(y_test, y_pred))
 
-    if f1 >= prev_best_f1:
+    if f1 >= prev_best_f1 and with_save:
+        print('SAVED')
         prev_best_f1 = f1
         model.save()
 
@@ -92,6 +94,7 @@ def main():
 
 
 def forward_pass(model, dialog):
+    model.zero_grad()
     model.hidden = model.init_hidden()
     for sent in dialog[:-1]:
         input = Variable(torch.LongTensor(sent))
@@ -101,5 +104,17 @@ def forward_pass(model, dialog):
     return out
 
 
+def main_test():
+    X_train, X_test, y_train, y_test = load_dialogs_and_labels('data/dialogs_and_labels.pickle')
+    model = DialogModel.load()
+    loss_function = nn.NLLLoss()
+
+    measure_model_quality(model, loss_function, X_test, y_test, 0, False)
+
+
+
 if __name__ == '__main__':
-    main()
+    if argv[1] == 'test':
+        main_test()
+    else:
+        main()
