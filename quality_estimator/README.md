@@ -61,24 +61,24 @@
 ```
   Dialog model quality:
 
-  Test loss: 1.804459071152004
-  Test F1: 0.6428754599680448
-               precision    recall  f1-score   support
-
-            0       0.78      0.81      0.79       240
-            1       0.29      0.20      0.23        46
-            2       0.24      0.27      0.26        44
-
-  avg / total       0.64      0.65      0.64       330
-
-
-  Utterance model quality:
-
-Test F1: 0.6329217526193655
+Test loss: 1.7054836003537612
+Test F1 label X: 0.21951219512195125
              precision    recall  f1-score   support
 
-          1       0.68      0.73      0.70       623
-          2       0.56      0.50      0.53       432
+          0       0.79      0.80      0.80       240
+          1       0.25      0.20      0.22        46
+          2       0.25      0.30      0.27        44
+
+avg / total       0.64      0.65      0.65       330
+
+
+66it [00:07,  6.39it/s]
+Test loss: 0.04567240583953134
+Test F1: 0.6308309613300651
+             precision    recall  f1-score   support
+
+          1       0.67      0.79      0.72       623
+          2       0.59      0.43      0.50       432
 
 avg / total       0.63      0.64      0.63      1055
 

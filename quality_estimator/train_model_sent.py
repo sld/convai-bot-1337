@@ -2,6 +2,7 @@ import pickle
 import torch
 import torch.utils.data
 import torch.nn as nn
+from sys import argv
 from torch.autograd import Variable
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
@@ -46,7 +47,7 @@ def forward_pass_sent(model, data):
     return out
 
 
-def measure_model_quality(model, loss_function, test_loader, prev_best_f1=0):
+def measure_model_quality(model, loss_function, test_loader, prev_best_f1=0, with_save=True):
     avg_loss = 0
     y_pred = []
     for batch_idx, (data, target) in tqdm(enumerate(test_loader)):
@@ -67,7 +68,7 @@ def measure_model_quality(model, loss_function, test_loader, prev_best_f1=0):
 
     print(classification_report(y_test, y_pred))
 
-    if f1 >= prev_best_f1:
+    if f1 >= prev_best_f1 and with_save:
         prev_best_f1 = f1
         model.save()
 
@@ -98,5 +99,16 @@ def main():
         prev_best_f1 = measure_model_quality(model, loss_function, test_loader, prev_best_f1)
 
 
+def main_test():
+    train_loader, test_loader = load_dialogs_and_labels('data/sent_data.pickle')
+    model = UtteranceModel.load()
+    loss_function = nn.NLLLoss()
+
+    measure_model_quality(model, loss_function, test_loader, 0, False)
+
+
 if __name__ == '__main__':
-    main()
+    if argv[1] == 'test':
+        main_test()
+    else:
+        main()
