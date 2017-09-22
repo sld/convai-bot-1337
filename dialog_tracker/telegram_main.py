@@ -39,6 +39,7 @@ class DialogTracker:
         dp.add_handler(CommandHandler("factoid_question", self._factoid_question_cmd))
         dp.add_handler(CommandHandler("help", self._help_cmd))
         dp.add_handler(CommandHandler("text", self._text_cmd))
+        dp.add_handler(CommandHandler("evaluation", self._evaluation_cmd))
 
         dp.add_handler(MessageHandler(Filters.text, self._echo_cmd))
 
@@ -66,6 +67,10 @@ class DialogTracker:
         )
         update.message.reply_text("Also, you can type /help to get help")
 
+    def _evaluation_cmd(self, bot, update):
+        self._log_user('_evaluation_cmd', update)
+
+        update.message.reply_text("Evaluation mode")
 
     def _factoid_question_cmd(self, bot, update):
         self._log_user('_factoid_question_cmd', update)
