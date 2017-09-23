@@ -168,6 +168,23 @@ class BotBrain:
         t.start()
         self._threads.append(t)
 
+    def generate_suggestions(self):
+        # Блин, нужен колоссальный рефакторинг, сделаем после 12 ноября
+        # ЧТобы было так: for each skill: generate
+        #
+        # Waiting* - BotBrain.wait_messages, ask factoid question
+        # ------------------------------------------------------------
+        # greet_user - NOT possible, clf type required (BotBrain.ClassifyGreeting)
+        #
+        # _get_factoid_question (CLASSIFY_ASK_QUESTION, waiting)
+        # checking_user_answer (CLASSIFY_ANSWER, is_asked)
+        # _get_answer_to_factoid_question (answer_to_user_question_) (CLASSIFY_QUESTION)
+        # _get_opennmt_fb_reply (answer_to_user_replica_with_fb_) (CLASSIFY_FB)
+        # _get_opennmt_chitchat_reply (answer_to_user_replica_) (CLASSIFY_REPLICA)
+        # _select_from_common_responses (_get_best_response) (BAD! or NOT? CLASSIFY_FB AND CLASSIFY_REPLICA)
+        # _classify_user_response_to_bot_answer (ANSWER_CORRECT, ANSWER_INCORRECT)
+        # ------------------------------------------------------------
+
     def _get_factoid_question(self):
         if len(self._factoid_qas) == 0:
             return None
@@ -247,6 +264,7 @@ class BotBrain:
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
         klass = self._classify(self._last_user_message)
+        self._last_classify_label = klass
         self._classify_user_utterance(klass)
 
     def _classify_user_utterance(self, clf_type):
@@ -383,7 +401,6 @@ class BotBrain:
         self._send_message(msg)
         self.return_to_wait()
 
-
     def _get_answer_to_factoid_question(self):
         out = subprocess.check_output(
             ["python3", "from_factoid_question_answerer/get_answer.py",
@@ -493,16 +510,6 @@ class BotBrain:
         logger.info("Got from fb chitchat: {}".format(res))
 
         return self._get_best_response(res)
-
-    def _get_seq2seq_reply(self):
-        words = [word for word in self._last_user_message.split(' ')]
-        context = " ".join(words[-29:])
-        r = requests.get(
-            'http://tf_chatbot:5000/reply',
-            params={'context': context}
-        )
-        res = self._filter_seq2seq_output(r.json()[0]['dec_inp'])
-        return res
 
     def go_from_choices(self, query_data):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
