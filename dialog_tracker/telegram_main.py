@@ -43,13 +43,15 @@ class DialogTracker:
 
         dp.add_handler(MessageHandler(Filters.text, self._echo_cmd))
 
-        dp.add_handler(CallbackQueryHandler(self._button))
+        dp.add_handler(CallbackQueryHandler(self._eval_keyboard))
         dp.add_error_handler(self._error)
 
         self._users_fsm = {}
         self._users = {}
         self._text_and_qas = load_text_and_qas('data/squad-25-qas.json')
         self._text_ind = 0
+        self._evaluation_mode = False
+        self._eval_suggestions = None
 
     def start(self):
         self._updater.start_polling()
@@ -69,8 +71,9 @@ class DialogTracker:
 
     def _evaluation_cmd(self, bot, update):
         self._log_user('_evaluation_cmd', update)
+        self._evaluation_mode = True
 
-        update.message.reply_text("Evaluation mode")
+        update.message.reply_text("Evaluation mode is on!")
 
     def _factoid_question_cmd(self, bot, update):
         self._log_user('_factoid_question_cmd', update)
@@ -116,6 +119,7 @@ class DialogTracker:
                    "/help - shows this message\n"
                    "/reset - reset the bot\n"
                    "/stop - stop the bot\n"
+                   "/evaluation - enable evaluation mode \n"
                    "\n"
                    "Version: {}".format(version))
         update.message.reply_text(message)
@@ -124,11 +128,40 @@ class DialogTracker:
         self._log_user('_text_cmd', update)
 
         self._add_fsm_and_user(update)
-
         update.message.reply_text("The text: \"{}\"".format(self._text()))
+
+    def _make_suggest_dict(self, eval_suggestions):
+        suggest_dict = {}
+        for klass, suggests in eval_suggestions:
+            if suggests[0] is not None:
+                for ind, suggest in enumerate(suggests):
+                    label = klass + " | " + str(suggest)
+                    key = "{}-{}".format(klass, ind)
+                    suggest_dict[key] = suggest
+            else:
+                suggest_dict[klass] = klass
+        suggest_dict["OTHER"] = "OTHER"
+        return suggest_dict
+
+    def _check_choosed(self, eval_suggestions, choosed_by_user):
+        suggest_dict = self._make_suggest_dict(eval_suggestions)
+        if choosed_by_user not in suggest_dict.keys():
+            return False
+        else:
+            return True
 
     def _echo_cmd(self, bot, update):
         self._log_user('_echo_cmd', update)
+
+        # Evaluation choice checking
+        if self._eval_suggestions:
+            choosed_by_user = update.message.text
+            if self._check_choosed(self._eval_suggestions, choosed_by_user):
+                update.message.reply_text('Thanks!')
+                self._eval_suggestions = None
+            else:
+                update.message.reply_text('Your choice is incorrect')
+            return
 
         self._add_fsm_and_user(update)
 
@@ -145,13 +178,35 @@ class DialogTracker:
             fsm.check_user_answer_on_asked()
         else:
             fsm.classify()
+            if self._evaluation_mode:
+                keyboard = [
+                    [telegram.InlineKeyboardButton("Good", callback_data='eval_good')],
+                    [telegram.InlineKeyboardButton("Bad", callback_data='eval_bad')  ]
+                ]
+                reply_markup = telegram.InlineKeyboardMarkup(keyboard)
+                update.message.reply_text('Please choose:', reply_markup=reply_markup)
 
-    def _button(self, bot, update):
+    def _make_suggestions_keyboard(self, suggestions):
+        keyboard = []
+        suggest_dict = self._make_suggest_dict(suggestions)
+        return "\n".join(["{} <> {}".format(k, v) for k, v in suggest_dict.items()])
+
+    def _eval_keyboard(self, bot, update):
+        self._eval_suggestions = None
         query = update.callback_query
         logger_bot.info("USER[_button]: {}".format(query.data))
-        bot.edit_message_text(text="...", chat_id=query.message.chat_id, message_id=query.message.message_id)
-
-        self._users_fsm[update.effective_user.id].go_from_choices(query.data)
+        fsm = self._users_fsm[update.effective_user.id]
+        if query.data == 'eval_good':
+            bot.edit_message_text(
+                text="Good!",
+                chat_id=query.message.chat_id,
+                message_id=query.message.message_id
+            )
+        elif query.data == 'eval_bad':
+            self._eval_suggestions = fsm.generate_suggestions()
+            reply_markup = self._make_suggestions_keyboard(self._eval_suggestions)
+            bot.edit_message_text('Please choose: \n {}'.format(reply_markup),
+                chat_id=query.message.chat_id, message_id=query.message.message_id)
 
     def _log_user(self, cmd, update):
         logger_bot.info("USER[{}]: {}".format(cmd, update.message.text))

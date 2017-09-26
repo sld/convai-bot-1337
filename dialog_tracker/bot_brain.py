@@ -73,8 +73,6 @@ class BotBrain:
     CLASSIFY_REPLICA = 'cr'
     CLASSIFY_FB = 'cf'
     CLASSIFY_ASK_QUESTION = 'caq'
-    ANSWER_CORRECT = 'ac'
-    ANSWER_INCORRECT = 'ai'
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=BotBrain.states, initial='init')
@@ -184,6 +182,45 @@ class BotBrain:
         # _select_from_common_responses (_get_best_response) (BAD! or NOT? CLASSIFY_FB AND CLASSIFY_REPLICA)
         # _classify_user_response_to_bot_answer (ANSWER_CORRECT, ANSWER_INCORRECT)
         # ------------------------------------------------------------
+
+        # При этом надо все таки знать какой ответ был бы при том или ином выборе!
+
+        def process_tsv(tsv):
+            payload = []
+            for line in tsv.split('\n'):
+                _, resp, score = line.split('\t')
+                score = float(score)
+                payload.append((resp, score))
+            payload = sorted(payload, key=lambda x: x[1], reverse=True)[:3]
+            return payload
+
+        answer = None
+        if self._last_factoid_qas and self._last_factoid_qas.get('answer'):
+            answer = self._last_factoid_qas.get('answer')
+
+        if self._factoid_qas:
+            qa = self._factoid_qas[0]
+
+        klass_to_string = {
+            BotBrain.CLASSIFY_ASK_QUESTION: 'Factoid question',
+            BotBrain.CLASSIFY_ANSWER: 'Answer to Factoid question',
+            BotBrain.CLASSIFY_QUESTION: 'Factoid question from user',
+            BotBrain.CLASSIFY_FB: 'Facebook seq2seq',
+            BotBrain.CLASSIFY_REPLICA: 'OpenSubtitles seq2seq'
+        }
+
+        fb_replicas = [self._get_opennmt_fb_reply()] + process_tsv(self._get_opennmt_fb_reply(with_heuristic=False))
+        opensubtitle_replicas = [self._get_opennmt_chitchat_reply()] + process_tsv(self._get_opennmt_chitchat_reply(with_heuristic=False))
+
+        result = [
+            (klass_to_string[BotBrain.CLASSIFY_ASK_QUESTION], [qa]),
+            (klass_to_string[BotBrain.CLASSIFY_ANSWER], [answer]),
+            (klass_to_string[BotBrain.CLASSIFY_QUESTION], [None]),
+            (klass_to_string[BotBrain.CLASSIFY_FB], fb_replicas),
+            (klass_to_string[BotBrain.CLASSIFY_REPLICA], opensubtitle_replicas),
+            ('Common Responses', [self._select_from_common_responses()])
+        ]
+        return result
 
     def _get_factoid_question(self):
         if len(self._factoid_qas) == 0:
@@ -424,7 +461,7 @@ class BotBrain:
             return self._dialog_context[-1][1]
         return ""
 
-    def _get_opennmt_chitchat_reply(self):
+    def _get_opennmt_chitchat_reply(self, with_heuristic=True):
         # feed_context = "{} {}".format(self._get_last_bot_reply(), self._last_user_message)
         sentence = self._last_user_message
         sentence_with_context = None
@@ -447,7 +484,10 @@ class BotBrain:
         res = str(output, "utf-8").strip()
         logger.info("Got from opennmt chitchat: {}".format(res))
 
-        return self._get_best_response(res)
+        if with_heuristic:
+            return self._get_best_response(res)
+        else:
+            return res
 
     def _get_best_response(self, tsv):
         best_score = -100000
@@ -486,7 +526,7 @@ class BotBrain:
         msg = combinate_and_return_answer(total_msg)
         return msg
 
-    def _get_opennmt_fb_reply(self):
+    def _get_opennmt_fb_reply(self, with_heuristic=True):
         # feed_context = "{} {}".format(self._get_last_bot_reply(), self._last_user_message)
         sentence = self._last_user_message
         sentence_with_context = None
@@ -509,29 +549,11 @@ class BotBrain:
         res = str(output, "utf-8").strip()
         logger.info("Got from fb chitchat: {}".format(res))
 
-        return self._get_best_response(res)
+        if with_heuristic:
+            return self._get_best_response(res)
+        else:
+            return res
 
-    def go_from_choices(self, query_data):
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
-
-        assert query_data[0] in ['c', 'a']
-
-        if query_data[0] == 'c':
-            self._classify_user_utterance(query_data)
-        elif query_data[0] == 'a':
-            self._classify_user_response_to_bot_answer(query_data)
-
-    def _classify_user_response_to_bot_answer(self, clf_type):
-        self._cancel_timer_threads()
-
-        if clf_type == BotBrain.ANSWER_CORRECT:
-            self.answer_to_user_question_correct()
-            self._send_message("Hooray! I'm smart {}".format(telegram.Emoji.SMILING_FACE_WITH_SUNGLASSES))
-        elif clf_type == BotBrain.ANSWER_INCORRECT:
-            self.answer_to_user_question_incorrect()
-            self._send_message(("Maybe 42? Sorry, I don't know the answer 🤔\n"
-                                " I hope my master will make me smarter."))
-        self.return_to_start()
 
     def _send_message(self, text, reply_markup=None):
         text = text.strip()
