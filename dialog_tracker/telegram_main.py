@@ -1,6 +1,7 @@
 import logging
 import telegram
 import json
+import datetime
 
 from random import sample
 from config import version
@@ -79,7 +80,8 @@ class DialogTracker:
         self._evaluation[update.effective_user.id] = {
             'suggestions': None,
             'thread': [],
-            'is_running': True
+            'is_running': True,
+            'text': self._text()
         }
 
         update.message.reply_text("Evaluation mode is on!")
@@ -142,7 +144,8 @@ class DialogTracker:
                    "/help - shows this message\n"
                    "/reset - reset the bot\n"
                    "/stop - stop the bot\n"
-                   "/evaluation - enable evaluation mode \n"
+                   "/evaluation_start - start the evaluation mode \n"
+                   "/evaluation_end - end the evaluation mode and save eval data \n"
                    "\n"
                    "Version: {}".format(version))
         update.message.reply_text(message)
@@ -262,9 +265,13 @@ class DialogTracker:
                 chat_id=query.message.chat_id, message_id=query.message.message_id)
         elif 'overall_' in query.data:
             self._evaluation[user_id]['evaluation'] = {'userId': 'Human', 'quality': query.data}
-            bot.edit_message_text('Evaluation is completed. Thanks! {}'.format(str(self._evaluation)),
+            bot.edit_message_text('Evaluation is completed. Thanks!',
                 chat_id=query.message.chat_id, message_id=query.message.message_id
             )
+            filename = '/src/data/evaluations/{}.json'.format(datetime.datetime.now())
+            with open(filename, 'w') as f:
+                json.dump(self._evaluation[user_id], f, indent=4, sort_keys=True)
+
 
     def _log_user(self, cmd, update):
         logger_bot.info("USER[{}]: {}".format(cmd, update.message.text))
