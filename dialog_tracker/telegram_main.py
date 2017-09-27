@@ -39,7 +39,8 @@ class DialogTracker:
         dp.add_handler(CommandHandler("factoid_question", self._factoid_question_cmd))
         dp.add_handler(CommandHandler("help", self._help_cmd))
         dp.add_handler(CommandHandler("text", self._text_cmd))
-        dp.add_handler(CommandHandler("evaluation", self._evaluation_cmd))
+        dp.add_handler(CommandHandler("evaluation_start", self._evaluation_start_cmd))
+        dp.add_handler(CommandHandler("evaluation_end", self._evaluation_end_cmd))
 
         dp.add_handler(MessageHandler(Filters.text, self._echo_cmd))
 
@@ -50,7 +51,7 @@ class DialogTracker:
         self._users = {}
         self._text_and_qas = load_text_and_qas('data/squad-25-qas.json')
         self._text_ind = 0
-        self._evaluation_mode = False
+        self._evaluation = {}
         self._eval_suggestions = None
 
     def start(self):
@@ -62,6 +63,10 @@ class DialogTracker:
 
         self._add_fsm_and_user(update)
         fsm = self._users_fsm[update.effective_user.id]
+
+        if update.effective_user.id in self._evaluation:
+            self._evaluation[update.effective_user.id]['is_running'] = False
+
         fsm.return_to_init()
         username = self._user_name(update)
         update.message.reply_text(
@@ -69,11 +74,29 @@ class DialogTracker:
         )
         update.message.reply_text("Also, you can type /help to get help")
 
-    def _evaluation_cmd(self, bot, update):
-        self._log_user('_evaluation_cmd', update)
-        self._evaluation_mode = True
+    def _evaluation_start_cmd(self, bot, update):
+        self._log_user('_evaluation_start_cmd', update)
+        self._evaluation[update.effective_user.id] = {
+            'suggestions': None,
+            'thread': [],
+            'is_running': True
+        }
 
         update.message.reply_text("Evaluation mode is on!")
+
+    def _evaluation_end_cmd(self, bot, update):
+        self._log_user('_evaluation_end_cmd', update)
+        self._evaluation[update.effective_user.id]['is_running'] = False
+        update.message.reply_text("Evaluation mode is off!")
+        keyboard = [
+            [
+                telegram.InlineKeyboardButton("Bad", callback_data='overall_bad'),
+                telegram.InlineKeyboardButton("Neutral", callback_data='overall_neutral'),
+                telegram.InlineKeyboardButton("Good", callback_data='overall_good')
+            ],
+        ]
+        reply_markup = telegram.InlineKeyboardMarkup(keyboard)
+        update.message.reply_text('"Evaluate overall dialogue quality, please: "', reply_markup=reply_markup)
 
     def _factoid_question_cmd(self, bot, update):
         self._log_user('_factoid_question_cmd', update)
@@ -148,26 +171,42 @@ class DialogTracker:
         if choosed_by_user not in suggest_dict.keys():
             return False
         else:
-            return True
+            return suggest_dict[choosed_by_user]
 
     def _echo_cmd(self, bot, update):
         self._log_user('_echo_cmd', update)
-
-        # Evaluation choice checking
-        if self._eval_suggestions:
-            choosed_by_user = update.message.text
-            if self._check_choosed(self._eval_suggestions, choosed_by_user):
-                update.message.reply_text('Thanks!')
-                self._eval_suggestions = None
-            else:
-                update.message.reply_text('Your choice is incorrect')
-            return
 
         self._add_fsm_and_user(update)
 
         username = self._user_name(update)
         fsm = self._users_fsm[update.effective_user.id]
         fsm._last_user_message = update.message.text
+        user_id = update.effective_user.id
+
+        # Evaluation choice checking
+        if user_id in self._evaluation and self._evaluation[user_id]['is_running'] and self._evaluation[user_id]['suggestions']:
+            suggestions = self._evaluation[user_id]['suggestions']
+            last_user_message, bot_msg = fsm._dialog_context[-1]
+            choosed_by_user = update.message.text
+            choosed_val = self._check_choosed(suggestions, choosed_by_user)
+            if choosed_val:
+                update.message.reply_text('Thanks!')
+                self._evaluation[user_id]['suggestions'] = None
+                row_user = {
+                    'text': last_user_message,
+                    'userId': 'Human'
+                }
+                row_bot = {
+                    'text': bot_msg,
+                    'choosed_by_user': {'class': choosed_by_user, 'sentence_data': choosed_val},
+                    'evaluation': '2', # 3 ili 2?
+                    'userId': 'Bot'
+                }
+                self._evaluation[user_id]['thread'].append(row_user)
+                self._evaluation[user_id]['thread'].append(row_bot)
+            else:
+                update.message.reply_text('Your choice is incorrect. Please, try again')
+            return
 
         if fsm.is_init():
             update.message.reply_text(
@@ -178,7 +217,7 @@ class DialogTracker:
             fsm.check_user_answer_on_asked()
         else:
             fsm.classify()
-            if self._evaluation_mode:
+            if user_id in self._evaluation and self._evaluation[user_id]['is_running']:
                 keyboard = [
                     [telegram.InlineKeyboardButton("Good", callback_data='eval_good')],
                     [telegram.InlineKeyboardButton("Bad", callback_data='eval_bad')  ]
@@ -192,21 +231,40 @@ class DialogTracker:
         return "\n".join(["{} <> {}".format(k, v) for k, v in suggest_dict.items()])
 
     def _eval_keyboard(self, bot, update):
-        self._eval_suggestions = None
         query = update.callback_query
         logger_bot.info("USER[_button]: {}".format(query.data))
-        fsm = self._users_fsm[update.effective_user.id]
+        user_id = update.effective_user.id
+        fsm = self._users_fsm[user_id]
+        last_user_message, bot_msg = fsm._dialog_context[-1]
         if query.data == 'eval_good':
             bot.edit_message_text(
-                text="Good!",
+                text="Thanks! Continue to chat, please",
                 chat_id=query.message.chat_id,
                 message_id=query.message.message_id
             )
+            self._evaluation[user_id]['suggestions'] = None
+            row_user = {
+                'text': last_user_message,
+                'userId': 'Human'
+            }
+            row_bot = {
+                'text': bot_msg,
+                'evaluation': '3',
+                'userId': 'Bot'
+            }
+            self._evaluation[user_id]['thread'].append(row_user)
+            self._evaluation[user_id]['thread'].append(row_bot)
         elif query.data == 'eval_bad':
-            self._eval_suggestions = fsm.generate_suggestions()
-            reply_markup = self._make_suggestions_keyboard(self._eval_suggestions)
+            suggestions = fsm.generate_suggestions()
+            self._evaluation[user_id]['suggestions'] = suggestions
+            reply_markup = self._make_suggestions_keyboard(suggestions)
             bot.edit_message_text('Please choose: \n {}'.format(reply_markup),
                 chat_id=query.message.chat_id, message_id=query.message.message_id)
+        elif 'overall_' in query.data:
+            self._evaluation[user_id]['evaluation'] = {'userId': 'Human', 'quality': query.data}
+            bot.edit_message_text('Evaluation is completed. Thanks! {}'.format(str(self._evaluation)),
+                chat_id=query.message.chat_id, message_id=query.message.message_id
+            )
 
     def _log_user(self, cmd, update):
         logger_bot.info("USER[{}]: {}".format(cmd, update.message.text))
