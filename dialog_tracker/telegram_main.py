@@ -268,7 +268,7 @@ class DialogTracker:
             bot.edit_message_text('Evaluation is completed. Thanks!',
                 chat_id=query.message.chat_id, message_id=query.message.message_id
             )
-            filename = '/src/data/evaluations/{}.json'.format(datetime.datetime.now())
+            filename = '/src/data/evaluations/{}-{}.json'.format(datetime.datetime.now(), user_id)
             with open(filename, 'w') as f:
                 json.dump(self._evaluation[user_id], f, indent=4, sort_keys=True)
 
