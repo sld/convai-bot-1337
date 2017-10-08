@@ -239,10 +239,12 @@ class BotBrain:
     def _get_alice_reply(self):
         alice_url = 'http://alice:3000'
         user_sentences = [e[0] for e in self._dialog_context]
-        user_sentences += [self._last_user_message]
+        if self._dialog_context and self._dialog_context[-1][0] != self._last_user_message:
+            user_sentences += [self._last_user_message]
+        print("Alice input {}".format(user_sentences))
         url = alice_url + '/respond'
         r = requests.post(url, json={'sentences': user_sentences})
-        print(r.json())
+        print("Alice output: {}".format(r.json()))
         return r.json()['message']
 
     def say_user_about_long_waiting(self):
