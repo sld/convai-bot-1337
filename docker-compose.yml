@@ -61,6 +61,8 @@ services:
         limits:
           memory: 512M
   alice:
+    build:
+      context: './ALICEChatAPI/'
     image: 'sld3/alice_chat:0.1.0'
     volumes:
       - './ALICEChatAPI:/src'

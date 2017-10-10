@@ -212,8 +212,8 @@ class BotBrain:
             BotBrain.CLASSIFY_ALICE: 'Alice'
         }
 
-        fb_replicas = [self._get_opennmt_fb_reply()] + process_tsv(self._get_opennmt_fb_reply(with_heuristic=False))
-        opensubtitle_replicas = [self._get_opennmt_chitchat_reply()] + process_tsv(self._get_opennmt_chitchat_reply(with_heuristic=False))
+        fb_replicas = process_tsv(self._get_opennmt_fb_reply(with_heuristic=False))
+        opensubtitle_replicas = process_tsv(self._get_opennmt_chitchat_reply(with_heuristic=False))
         alice_replicas = [self._get_alice_reply()]
 
         result = [
@@ -241,11 +241,14 @@ class BotBrain:
         user_sentences = [e[0] for e in self._dialog_context]
         if self._dialog_context and self._dialog_context[-1][0] != self._last_user_message:
             user_sentences += [self._last_user_message]
+        elif not self._dialog_context:
+            user_sentences = [self._last_user_message]
         print("Alice input {}".format(user_sentences))
         url = alice_url + '/respond'
         r = requests.post(url, json={'sentences': user_sentences})
         print("Alice output: {}".format(r.json()))
-        return r.json()['message']
+        msg = self._filter_seq2seq_output(r.json()['message'])
+        return msg
 
     def say_user_about_long_waiting(self):
         self._cancel_timer_threads(reset_question=False, presereve_cntr=True, reset_seq2seq_context=False)
@@ -312,7 +315,7 @@ class BotBrain:
             return BotBrain.CLASSIFY_QUESTION
         elif res == '__label__2':
             return BotBrain.CLASSIFY_FB
-        elif res == '__label__4':
+        elif res == '__label__4' or res == '__label__3': # TMP hack, because in some cases classifier returns label3 here
             return BotBrain.CLASSIFY_ALICE
 
     def get_klass_of_user_message(self):
@@ -346,7 +349,7 @@ class BotBrain:
 
     def _is_not_answer(self, reply):
         reply = normalize(reply)
-        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/model_answer_detector.ftz -".format(reply)
+        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/model_all_labels.ftz -".format(reply)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
@@ -526,7 +529,8 @@ class BotBrain:
                 best_resp = resp
 
         if self._is_bad_resp(best_resp):
-            best_resp = self._select_from_common_responses()
+            # best_resp = self._select_from_common_responses()
+            best_resp = self._get_alice_reply()
 
         logger.info("Best response is {}".format(best_resp))
         return best_resp
@@ -534,6 +538,8 @@ class BotBrain:
     def _is_bad_resp(self, resp):
         if len(self._dialog_context) > 1:
             if (self._dialog_context[-2][1] == self._dialog_context[-1][1]):
+                return True
+            if (self._dialog_context[-1][1] == self._last_user_message):
                 return True
 
         if '<unk>' in resp or re.match('\w', resp) is None or ('youtube' in resp and 'www' in resp and 'watch' in resp):
