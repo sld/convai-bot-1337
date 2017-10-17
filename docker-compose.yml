@@ -60,3 +60,15 @@ services:
       resources:
         limits:
           memory: 512M
+  alice:
+    build:
+      context: './ALICEChatAPI/'
+    image: 'sld3/alice_chat:0.1.0'
+    volumes:
+      - './ALICEChatAPI:/src'
+    command: python -u server.py
+    restart: 'always'
+    deploy:
+      resources:
+        limits:
+          memory: 512M

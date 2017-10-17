@@ -16,3 +16,4 @@ classifiers/squad/questions.txt
 *.tar.gz
 facebook-news/
 *.pickle
+dialog_tracker/data/evaluations/*.json

@@ -73,6 +73,7 @@ class BotBrain:
     CLASSIFY_REPLICA = 'cr'
     CLASSIFY_FB = 'cf'
     CLASSIFY_ASK_QUESTION = 'caq'
+    CLASSIFY_ALICE = "calice"
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=BotBrain.states, initial='init')
@@ -103,6 +104,7 @@ class BotBrain:
 
         self.machine.add_transition('answer_to_user_replica', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_')
         self.machine.add_transition('answer_to_user_replica_with_fb', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_fb_')
+        self.machine.add_transition('answer_to_user_replica_with_alice', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_alice_')
 
         self.machine.add_transition('long_wait', 'asked', 'waiting', after='say_user_about_long_waiting')
         self.machine.add_transition('too_long_wait', 'waiting', 'waiting', after='say_user_about_long_waiting')
@@ -206,11 +208,13 @@ class BotBrain:
             BotBrain.CLASSIFY_ANSWER: 'Answer to Factoid question',
             BotBrain.CLASSIFY_QUESTION: 'Factoid question from user',
             BotBrain.CLASSIFY_FB: 'Facebook seq2seq',
-            BotBrain.CLASSIFY_REPLICA: 'OpenSubtitles seq2seq'
+            BotBrain.CLASSIFY_REPLICA: 'OpenSubtitles seq2seq',
+            BotBrain.CLASSIFY_ALICE: 'Alice'
         }
 
-        fb_replicas = [self._get_opennmt_fb_reply()] + process_tsv(self._get_opennmt_fb_reply(with_heuristic=False))
-        opensubtitle_replicas = [self._get_opennmt_chitchat_reply()] + process_tsv(self._get_opennmt_chitchat_reply(with_heuristic=False))
+        fb_replicas = process_tsv(self._get_opennmt_fb_reply(with_heuristic=False))
+        opensubtitle_replicas = process_tsv(self._get_opennmt_chitchat_reply(with_heuristic=False))
+        alice_replicas = [self._get_alice_reply()]
 
         result = [
             (klass_to_string[BotBrain.CLASSIFY_ASK_QUESTION], [qa]),
@@ -218,6 +222,7 @@ class BotBrain:
             (klass_to_string[BotBrain.CLASSIFY_QUESTION], [None]),
             (klass_to_string[BotBrain.CLASSIFY_FB], fb_replicas),
             (klass_to_string[BotBrain.CLASSIFY_REPLICA], opensubtitle_replicas),
+            (klass_to_string[BotBrain.CLASSIFY_ALICE], alice_replicas),
             ('Common Responses', [self._select_from_common_responses()])
         ]
         return result
@@ -230,6 +235,20 @@ class BotBrain:
         self._last_factoid_qas = self._factoid_qas[0]
         self._factoid_qas = self._factoid_qas[1:]
         return self._question_asked
+
+    def _get_alice_reply(self):
+        alice_url = 'http://alice:3000'
+        user_sentences = [e[0] for e in self._dialog_context]
+        if self._dialog_context and self._dialog_context[-1][0] != self._last_user_message:
+            user_sentences += [self._last_user_message]
+        elif not self._dialog_context:
+            user_sentences = [self._last_user_message]
+        print("Alice input {}".format(user_sentences))
+        url = alice_url + '/respond'
+        r = requests.post(url, json={'sentences': user_sentences})
+        print("Alice output: {}".format(r.json()))
+        msg = self._filter_seq2seq_output(r.json()['message'])
+        return msg
 
     def say_user_about_long_waiting(self):
         self._cancel_timer_threads(reset_question=False, presereve_cntr=True, reset_seq2seq_context=False)
@@ -272,7 +291,7 @@ class BotBrain:
 
     def _classify(self, text):
         text = normalize(text)
-        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/model.ftz -".format(text)
+        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/model_all_labels.ftz -".format(text)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
@@ -296,6 +315,8 @@ class BotBrain:
             return BotBrain.CLASSIFY_QUESTION
         elif res == '__label__2':
             return BotBrain.CLASSIFY_FB
+        elif res == '__label__4' or res == '__label__3': # TMP hack, because in some cases classifier returns label3 here
+            return BotBrain.CLASSIFY_ALICE
 
     def get_klass_of_user_message(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
@@ -323,10 +344,12 @@ class BotBrain:
             self.answer_to_user_replica_with_fb()
         elif clf_type == BotBrain.CLASSIFY_ASK_QUESTION:
             self.ask_question_after_classifying()
+        elif clf_type == BotBrain.CLASSIFY_ALICE:
+            self.answer_to_user_replica_with_alice()
 
     def _is_not_answer(self, reply):
         reply = normalize(reply)
-        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/model_answer_detector.ftz -".format(reply)
+        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/model_all_labels.ftz -".format(reply)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
@@ -456,6 +479,12 @@ class BotBrain:
         self._send_message(bots_answer)
         self.return_to_wait()
 
+    def answer_to_user_replica_with_alice_(self):
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        bots_answer = self._get_alice_reply()
+        self._send_message(bots_answer)
+        self.return_to_wait()
+
     def _get_last_bot_reply(self):
         if len(self._dialog_context):
             return self._dialog_context[-1][1]
@@ -500,7 +529,8 @@ class BotBrain:
                 best_resp = resp
 
         if self._is_bad_resp(best_resp):
-            best_resp = self._select_from_common_responses()
+            # best_resp = self._select_from_common_responses()
+            best_resp = self._get_alice_reply()
 
         logger.info("Best response is {}".format(best_resp))
         return best_resp
@@ -508,6 +538,8 @@ class BotBrain:
     def _is_bad_resp(self, resp):
         if len(self._dialog_context) > 1:
             if (self._dialog_context[-2][1] == self._dialog_context[-1][1]):
+                return True
+            if (self._dialog_context[-1][1] == self._last_user_message):
                 return True
 
         if '<unk>' in resp or re.match('\w', resp) is None or ('youtube' in resp and 'www' in resp and 'watch' in resp):
