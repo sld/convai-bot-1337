@@ -83,3 +83,17 @@ SparsityPhi     = 0.82382
 SparsityTheta   = 0.49320
 Writing model predictions into wiki15+3topics.new.theta.txt... OK.
 OK.
+
+
+# Requirements
+
+* bigartm, nltk
+* python 3.6
+
+
+# How to test
+
+```
+./predict_pipeline.sh ./test.txt
+python get_topics.py /tmp/pred-tm-83F18394
+```
