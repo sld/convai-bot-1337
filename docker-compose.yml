@@ -72,3 +72,17 @@ services:
       resources:
         limits:
           memory: 512M
+  bigartm:
+    build:
+      context: './topic-modelling/'
+    image: 'sld3/bigartm:0.1.0'
+    volumes:
+      - './topic-modelling:/src'
+    command: gunicorn -w 4 -b 0.0.0.0:3000 server:app
+    ports:
+      - '3000:3000'
+    restart: 'always'
+    deploy:
+      resources:
+        limits:
+          memory: 512M

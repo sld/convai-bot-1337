@@ -1,6 +1,6 @@
 import nltk
 import sys
-# nltk.download('wordnet')
+
 from nltk.stem.wordnet import WordNetLemmatizer
 from collections import Counter
 from signal import signal, SIGPIPE, SIG_DFL

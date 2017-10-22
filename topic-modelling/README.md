@@ -95,5 +95,5 @@ OK.
 
 ```
 ./predict_pipeline.sh ./test.txt
-python get_topics.py /tmp/pred-tm-83F18394
+python skill.py /tmp/pred-tm-83F18394
 ```
