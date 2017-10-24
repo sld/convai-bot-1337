@@ -17,3 +17,5 @@ classifiers/squad/questions.txt
 facebook-news/
 *.pickle
 dialog_tracker/data/evaluations/*.json
+topic-modelling/vw.wiki-en.txt
+topic-modelling/bigartm.*

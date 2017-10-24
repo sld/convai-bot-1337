@@ -14,6 +14,7 @@ services:
       - opennmtchitchat
       - opennmtfbpost
       - opennmtsummary
+      - bigartm
     deploy:
       resources:
         limits:

@@ -41,9 +41,10 @@ def greet_user(bot, chat_id):
     hello_messages_1 = ['Well hello there!', 'How’s it going?', 'What’s up?',
                         'Yo!', 'Alright mate?', 'Whazzup?', 'Hiya!',
                         'Nice to see you!', 'Good to see you!']
-    hello_messages_2 = ["Let's discuss this awesome text!",
-        "I'm coming up with a question about the text...",
-        "Would you mind to ask me some factual question about the text? Maybe I'll do it first..." ]
+    # hello_messages_2 = ["Let's discuss this awesome text!",
+    #     "I'm coming up with a question about the text...",
+    #     "Would you mind to ask me some factual question about the text? Maybe I'll do it first..." ]
+    hello_messages_2 = [""]
 
     greet_messages = [hello_messages_1, hello_messages_2]
     msg = combinate_and_return_answer(greet_messages)
@@ -67,6 +68,7 @@ class BotBrain:
 
     CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
     FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
+    BIGARTM_URL = 'http://bigartm:3000'
 
     CLASSIFY_ANSWER = 'ca'
     CLASSIFY_QUESTION = 'cq'
@@ -129,6 +131,7 @@ class BotBrain:
         # to prevent recursion call
         self._is_chitchat_replica_is_answer = False
 
+        self._setup_topics_info()
 
     def _init_factoid_qas_and_text(self):
         # list of all questions and answers
@@ -139,9 +142,26 @@ class BotBrain:
         # last asked factoid qas
         self._last_factoid_qas = None
 
+    def _setup_topics_info(self):
+        def _send_additional():
+            response = random.sample(self._best_additionals, k=1)[0]
+            print(["topic additinonal", response])
+            self._send_message(response)
+
+        if self._text:
+            r = requests.post(BotBrain.BIGARTM_URL + '/respond', json={'text': self._text})
+            self._topics_info = r.json()['result']
+            print("Topics result: {}".format(self._topics_info))
+            self._best_additionals = self._topics_info[0]['responses']
+
+            t = threading.Timer(1, _send_additional)
+            t.start()
+            # self._threads.append(t)
+
     def set_text_and_qa(self, text_and_qa):
         self._text_and_qa = text_and_qa
         self._init_factoid_qas_and_text()
+        self._setup_topics_info()
 
     def wait_for_user_typing(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
@@ -230,7 +250,8 @@ class BotBrain:
             (klass_to_string[BotBrain.CLASSIFY_REPLICA], opensubtitle_replicas),
             (klass_to_string[BotBrain.CLASSIFY_ALICE], alice_replicas),
             (klass_to_string[BotBrain.CLASSIFY_SUMMARY], summaries),
-            ('Common Responses', [self._select_from_common_responses()])
+            ('Common Responses', [self._select_from_common_responses()]),
+            ('Topic Modelling', self._topics_info)
         ]
         return result
 
