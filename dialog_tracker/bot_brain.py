@@ -74,6 +74,8 @@ class BotBrain:
     CLASSIFY_FB = 'cf'
     CLASSIFY_ASK_QUESTION = 'caq'
     CLASSIFY_ALICE = "calice"
+    CLASSIFY_SUMMARY = "csummary"
+
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=BotBrain.states, initial='init')
@@ -105,6 +107,7 @@ class BotBrain:
         self.machine.add_transition('answer_to_user_replica', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_')
         self.machine.add_transition('answer_to_user_replica_with_fb', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_fb_')
         self.machine.add_transition('answer_to_user_replica_with_alice', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_alice_')
+        self.machine.add_transition('answer_to_user_with_summary', 'classifying', 'bot_answering_replica', after='answer_to_user_with_summary_')
 
         self.machine.add_transition('long_wait', 'asked', 'waiting', after='say_user_about_long_waiting')
         self.machine.add_transition('too_long_wait', 'waiting', 'waiting', after='say_user_about_long_waiting')
@@ -209,12 +212,15 @@ class BotBrain:
             BotBrain.CLASSIFY_QUESTION: 'Factoid question from user',
             BotBrain.CLASSIFY_FB: 'Facebook seq2seq',
             BotBrain.CLASSIFY_REPLICA: 'OpenSubtitles seq2seq',
-            BotBrain.CLASSIFY_ALICE: 'Alice'
+            BotBrain.CLASSIFY_ALICE: 'Alice',
+            BotBrain.CLASSIFY_SUMMARY: 'Summary'
+
         }
 
         fb_replicas = process_tsv(self._get_opennmt_fb_reply(with_heuristic=False))
         opensubtitle_replicas = process_tsv(self._get_opennmt_chitchat_reply(with_heuristic=False))
         alice_replicas = [self._get_alice_reply()]
+        summaries = self._get_summaries()
 
         result = [
             (klass_to_string[BotBrain.CLASSIFY_ASK_QUESTION], [qa]),
@@ -223,6 +229,7 @@ class BotBrain:
             (klass_to_string[BotBrain.CLASSIFY_FB], fb_replicas),
             (klass_to_string[BotBrain.CLASSIFY_REPLICA], opensubtitle_replicas),
             (klass_to_string[BotBrain.CLASSIFY_ALICE], alice_replicas),
+            (klass_to_string[BotBrain.CLASSIFY_SUMMARY], summaries),
             ('Common Responses', [self._select_from_common_responses()])
         ]
         return result
@@ -249,6 +256,9 @@ class BotBrain:
         print("Alice output: {}".format(r.json()))
         msg = self._filter_seq2seq_output(r.json()['message'])
         return msg
+
+    def _get_summaries(self):
+        return ['Hi']
 
     def say_user_about_long_waiting(self):
         self._cancel_timer_threads(reset_question=False, presereve_cntr=True, reset_seq2seq_context=False)
@@ -302,6 +312,9 @@ class BotBrain:
             and ("n't" not in text and 'not' not in text):
             return BotBrain.CLASSIFY_ASK_QUESTION
 
+        if 'summary' in text:
+            return BotBrain.CLASSIFY_SUMMARY
+
         logger.info('_classify: QUESTION ASKED: {}'.format(self._question_asked))
 
         if self._question_asked and self._is_user_answer_correct() >= 80:
@@ -346,6 +359,8 @@ class BotBrain:
             self.ask_question_after_classifying()
         elif clf_type == BotBrain.CLASSIFY_ALICE:
             self.answer_to_user_replica_with_alice()
+        elif clf_type == BotBrain.CLASSIFY_SUMMARY:
+            self.answer_to_user_with_summary()
 
     def _is_not_answer(self, reply):
         reply = normalize(reply)
@@ -482,6 +497,16 @@ class BotBrain:
     def answer_to_user_replica_with_alice_(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
         bots_answer = self._get_alice_reply()
+        self._send_message(bots_answer)
+        self.return_to_wait()
+
+    def answer_to_user_with_summary_(self):
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        bots_answer = self._get_summaries()
+        if bots_answer == []:
+            bots_answer = self._get_alice_reply()
+        else:
+            bots_answer = bots_answer[0] #TODO: select best summary
         self._send_message(bots_answer)
         self.return_to_wait()
 
