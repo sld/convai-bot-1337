@@ -13,6 +13,7 @@ services:
       - opennmt
       - opennmtchitchat
       - opennmtfbpost
+      - bigartm
     deploy:
       resources:
         limits:
