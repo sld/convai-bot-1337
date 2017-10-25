@@ -1,6 +1,5 @@
 import logging
 import threading
-import telegram
 import itertools
 import random
 import subprocess
@@ -10,10 +9,9 @@ import config
 
 from fuzzywuzzy import fuzz
 from nltk import word_tokenize
+from nltk.corpus import stopwords
 from from_opennmt_chitchat.get_reply import normalize, detokenize
 from transitions.extensions import LockedMachine as Machine
-from telegram.utils import request
-
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -68,6 +66,7 @@ class BotBrain:
 
     CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
     FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
+    SUMMARIZER_URL = 'tcp://opennmtsummary:5556'
     BIGARTM_URL = 'http://bigartm:3000'
 
     CLASSIFY_ANSWER = 'ca'
@@ -86,11 +85,11 @@ class BotBrain:
         self.machine.add_transition('start_convai', 'init', 'started', after='wait_for_user_typing_convai')
         self.machine.add_transition('ask_question', 'started', 'asked', after='ask_question_to_user')
 
-        self.machine.add_transition('classify', 'started', 'classifying', after='get_klass_of_user_message')
-        self.machine.add_transition('classify', 'asked', 'classifying', after='get_klass_of_user_message')
-        self.machine.add_transition('classify', 'waiting', 'classifying', after='get_klass_of_user_message')
-        self.machine.add_transition('classify', 'classifying', 'classifying', after='get_klass_of_user_message')
-        self.machine.add_transition('classify', 'checking_answer', 'classifying', after='get_klass_of_user_message')
+        self.machine.add_transition('classify', 'started', 'classifying', after='get_class_of_user_message')
+        self.machine.add_transition('classify', 'asked', 'classifying', after='get_class_of_user_message')
+        self.machine.add_transition('classify', 'waiting', 'classifying', after='get_class_of_user_message')
+        self.machine.add_transition('classify', 'classifying', 'classifying', after='get_class_of_user_message')
+        self.machine.add_transition('classify', 'checking_answer', 'classifying', after='get_class_of_user_message')
 
         self.machine.add_transition('check_user_answer_on_asked', 'asked', 'checking_answer', after='checking_user_answer')
         self.machine.add_transition('check_user_answer', 'classifying', 'checking_answer', after='checking_user_answer')
@@ -102,7 +101,7 @@ class BotBrain:
         self.machine.add_transition('return_to_init', '*', 'init', after='clear_all')
 
         self.machine.add_transition('answer_to_user_question', 'classifying', 'bot_answering_question', after='answer_to_user_question_')
-        self.machine.add_transition('classify', 'bot_answering_question', 'classifying', after='get_klass_of_user_message')
+        self.machine.add_transition('classify', 'bot_answering_question', 'classifying', after='get_class_of_user_message')
         self.machine.add_transition('answer_to_user_question_correct', 'bot_answering_question', 'bot_correct_answer')
         self.machine.add_transition('answer_to_user_question_incorrect', 'bot_answering_question', 'bot_incorrect_answer')
 
@@ -226,7 +225,7 @@ class BotBrain:
         if self._factoid_qas:
             qa = self._factoid_qas[0]
 
-        klass_to_string = {
+        class_to_string = {
             BotBrain.CLASSIFY_ASK_QUESTION: 'Factoid question',
             BotBrain.CLASSIFY_ANSWER: 'Answer to Factoid question',
             BotBrain.CLASSIFY_QUESTION: 'Factoid question from user',
@@ -234,7 +233,6 @@ class BotBrain:
             BotBrain.CLASSIFY_REPLICA: 'OpenSubtitles seq2seq',
             BotBrain.CLASSIFY_ALICE: 'Alice',
             BotBrain.CLASSIFY_SUMMARY: 'Summary'
-
         }
 
         fb_replicas = process_tsv(self._get_opennmt_fb_reply(with_heuristic=False))
@@ -243,13 +241,13 @@ class BotBrain:
         summaries = self._get_summaries()
 
         result = [
-            (klass_to_string[BotBrain.CLASSIFY_ASK_QUESTION], [qa]),
-            (klass_to_string[BotBrain.CLASSIFY_ANSWER], [answer]),
-            (klass_to_string[BotBrain.CLASSIFY_QUESTION], [None]),
-            (klass_to_string[BotBrain.CLASSIFY_FB], fb_replicas),
-            (klass_to_string[BotBrain.CLASSIFY_REPLICA], opensubtitle_replicas),
-            (klass_to_string[BotBrain.CLASSIFY_ALICE], alice_replicas),
-            (klass_to_string[BotBrain.CLASSIFY_SUMMARY], summaries),
+            (class_to_string[BotBrain.CLASSIFY_ASK_QUESTION], [qa]),
+            (class_to_string[BotBrain.CLASSIFY_ANSWER], [answer]),
+            (class_to_string[BotBrain.CLASSIFY_QUESTION], [None]),
+            (class_to_string[BotBrain.CLASSIFY_FB], fb_replicas),
+            (class_to_string[BotBrain.CLASSIFY_REPLICA], opensubtitle_replicas),
+            (class_to_string[BotBrain.CLASSIFY_ALICE], alice_replicas),
+            (class_to_string[BotBrain.CLASSIFY_SUMMARY], summaries),
             ('Common Responses', [self._select_from_common_responses()]),
             ('Topic Modelling', self._topics_info)
         ]
@@ -277,9 +275,6 @@ class BotBrain:
         print("Alice output: {}".format(r.json()))
         msg = self._filter_seq2seq_output(r.json()['message'])
         return msg
-
-    def _get_summaries(self):
-        return ['Hi']
 
     def say_user_about_long_waiting(self):
         self._cancel_timer_threads(reset_question=False, presereve_cntr=True, reset_seq2seq_context=False)
@@ -333,6 +328,7 @@ class BotBrain:
             and ("n't" not in text and 'not' not in text):
             return BotBrain.CLASSIFY_ASK_QUESTION
 
+        # TODO: make more clever classification
         if 'summary' in text:
             return BotBrain.CLASSIFY_SUMMARY
 
@@ -352,12 +348,12 @@ class BotBrain:
         elif res == '__label__4' or res == '__label__3': # TMP hack, because in some cases classifier returns label3 here
             return BotBrain.CLASSIFY_ALICE
 
-    def get_klass_of_user_message(self):
+    def get_class_of_user_message(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
-        klass = self._classify(self._last_user_message)
-        self._last_classify_label = klass
-        self._classify_user_utterance(klass)
+        message_class = self._classify(self._last_user_message)
+        self._last_classify_label = message_class
+        self._classify_user_utterance(message_class)
 
     def _classify_user_utterance(self, clf_type):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
@@ -524,10 +520,6 @@ class BotBrain:
     def answer_to_user_with_summary_(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
         bots_answer = self._get_summaries()
-        if bots_answer == []:
-            bots_answer = self._get_alice_reply()
-        else:
-            bots_answer = bots_answer[0] #TODO: select best summary
         self._send_message(bots_answer)
         self.return_to_wait()
 
@@ -592,6 +584,29 @@ class BotBrain:
             return True
         else:
             return False
+
+    def _get_stopwords_count(self, resp):
+        return len(list(filter(lambda x: x.lower() in stopwords.words('english'), word_tokenize(resp))))
+
+    def _get_summaries(self, with_heuristic=True):
+        text = self._text
+        logger.info("Send to opennmt summary: {}".format(text))
+        cmd = "echo \"{}\" | python from_opennmt_summary/get_reply.py {}".format(text, BotBrain.SUMMARIZER_URL)
+        ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = ps.communicate()[0]
+        res = str(output, "utf-8").strip()
+        logger.info("Got from opennmt summary: {}".format(res))
+        # now lets select one best response
+        candidates = []
+        for line in res.split('\n'):
+            _, resp, score = line.split('\t')
+            words_cnt = len(word_tokenize(resp))
+            print(resp, words_cnt, self._get_stopwords_count(resp))
+            if words_cnt >= 2 and self._get_stopwords_count(resp) / words_cnt < 0.5 and '<unk>' not in resp:
+                candidates.append(resp)
+        if len(candidates) > 0:
+            return random.choice(candidates)
+        return self._get_alice_reply()
 
     def _select_from_common_responses(self):
         msg1 = ['Do you know what?', '', "I don't understand :(", '¯\_(ツ)_/¯']

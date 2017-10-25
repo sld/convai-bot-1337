@@ -42,7 +42,7 @@ services:
   opennmtsummary:
     image: 'sld3/opennmt:611e636_distro5beb83'
     volumes:
-      - './opennmt_summary/models:/root/data'
+      - './opennmt_summarization/models:/root/data'
     command: >
       bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0
       -port 5556  -model /root/data/textsum_epoch7_14.69_release.t7
