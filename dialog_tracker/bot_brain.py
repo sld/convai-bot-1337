@@ -323,13 +323,14 @@ class BotBrain:
         res = str(output, "utf-8").strip()
         logger.info(res)
 
+        # TODO: make more clever classification
         if ('ask me' in text or 'discuss with me' in text or 'talk with me' in text \
             or 'ask question' in text or 'ask a question' in text or 'next question' in text) \
             and ("n't" not in text and 'not' not in text):
             return BotBrain.CLASSIFY_ASK_QUESTION
 
-        # TODO: make more clever classification
-        if 'summary' in text:
+        if ('text' in text or 'paragraph' in text or 'article' in text) and ('about' in text or 'summar' in text or 'short' in text) \
+            and ("n't" not in text and 'not' not in text):
             return BotBrain.CLASSIFY_SUMMARY
 
         logger.info('_classify: QUESTION ASKED: {}'.format(self._question_asked))

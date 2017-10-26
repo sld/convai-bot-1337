@@ -4,8 +4,6 @@ from nltk import word_tokenize
 from nltk.tokenize.moses import MosesDetokenizer
 from signal import signal, SIGPIPE, SIG_DFL
 from sys import argv
-from random import random
-from nltk.corpus import stopwords
 
 
 class ConnectionHandler:
