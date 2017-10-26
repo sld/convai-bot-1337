@@ -1,17 +1,19 @@
-import logging
-import threading
 import itertools
+import logging
 import random
-import subprocess
-import requests
 import re
-import config
+import subprocess
+import threading
 
+import config
+import requests
+from from_opennmt_chitchat.get_reply import normalize, detokenize
 from fuzzywuzzy import fuzz
 from nltk import word_tokenize
 from nltk.corpus import stopwords
-from from_opennmt_chitchat.get_reply import normalize, detokenize
 from transitions.extensions import LockedMachine as Machine
+
+from intent_classifier.intent_classifier import IntentClassifier
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -129,6 +131,10 @@ class BotBrain:
         self._is_first_incorrect = True
         # to prevent recursion call
         self._is_chitchat_replica_is_answer = False
+        # TODO: we can pass intent_classifier to _init_ method
+        # otherwise we have intent_classifier for each session
+        self.intent_classifier = IntentClassifier(path_to_datafile='./intent_classifier/data/data.tsv',
+                                                  path_to_embedding='./intent_classifier/data/glove.6B.100d.txt')
 
         self._setup_topics_info()
 
@@ -332,6 +338,20 @@ class BotBrain:
         if ('text' in text or 'paragraph' in text or 'article' in text) and ('about' in text or 'summar' in text or 'short' in text) \
             and ("n't" not in text and 'not' not in text):
             return BotBrain.CLASSIFY_SUMMARY
+
+
+        scores = self.intent_classifier.get_scores(text)
+        print(scores)
+        max_score, max_intent = 0, None
+        for intent in [BotBrain.CLASSIFY_ASK_QUESTION, BotBrain.CLASSIFY_SUMMARY]:
+            # TODO: adjust this threshold to other answers
+            if scores[intent] > 0.8:
+                if max_score < scores[intent + '_max']:
+                    max_score = scores[intent + '_max']
+                    max_intent = intent
+        print(max_intent, max_score)
+        if max_intent is not None and max_score > 0.95:
+            return max_intent
 
         logger.info('_classify: QUESTION ASKED: {}'.format(self._question_asked))
 
@@ -558,6 +578,8 @@ class BotBrain:
             return res
 
     def _get_best_response(self, tsv):
+        # score is perplexity: it can't describe quality of answer
+        # TODO: maybe make like in summarization? filter stopwords answers and take random
         best_score = -100000
         best_resp = ""
         for line in tsv.split('\n'):
@@ -647,7 +669,6 @@ class BotBrain:
             return self._get_best_response(res)
         else:
             return res
-
 
     def _send_message(self, text, reply_markup=None):
         text = text.strip()

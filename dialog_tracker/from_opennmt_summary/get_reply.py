@@ -62,6 +62,7 @@ def split_text_on_chunks(text, max_len=75, overlap=15):
         chunks.append(' '.join(tokens[i: i + max_len]))
     return chunks
 
+
 if __name__ == '__main__':
     fin = sys.stdin
     # input source text
