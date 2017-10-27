@@ -77,6 +77,8 @@ class BotBrain:
     CLASSIFY_ALICE = "calice"
     CLASSIFY_SUMMARY = "csummary"
 
+    MESSAGE_CLASSIFIER_MODEL = "model_all_labels.ftz"
+
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=BotBrain.states, initial='init')
@@ -317,7 +319,7 @@ class BotBrain:
 
     def _classify(self, text):
         text = normalize(text)
-        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/model_all_labels.ftz -".format(text)
+        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/{} -".format(text, BotBrain.MESSAGE_CLASSIFIER_MODEL)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
@@ -387,7 +389,7 @@ class BotBrain:
 
     def _is_not_answer(self, reply):
         reply = normalize(reply)
-        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/model_all_labels.ftz -".format(reply)
+        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/{} -".format(reply, BotBrain.MESSAGE_CLASSIFIER_MODEL)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
