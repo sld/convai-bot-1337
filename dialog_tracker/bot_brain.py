@@ -340,18 +340,9 @@ class BotBrain:
             return BotBrain.CLASSIFY_SUMMARY
 
 
-        scores = self.intent_classifier.get_scores(text)
-        print(scores)
-        max_score, max_intent = 0, None
-        for intent in [BotBrain.CLASSIFY_ASK_QUESTION, BotBrain.CLASSIFY_SUMMARY]:
-            # TODO: adjust this threshold to other answers
-            if scores[intent] > 0.8:
-                if max_score < scores[intent + '_max']:
-                    max_score = scores[intent + '_max']
-                    max_intent = intent
-        print(max_intent, max_score)
-        if max_intent is not None and max_score > 0.95:
-            return max_intent
+        intent = self._get_intent(text)
+        if intent is not None:
+            return intent
 
         logger.info('_classify: QUESTION ASKED: {}'.format(self._question_asked))
 
@@ -669,6 +660,21 @@ class BotBrain:
             return self._get_best_response(res)
         else:
             return res
+
+    def _get_intent(self, text):
+        scores = self.intent_classifier.get_scores(text)
+        print(scores)
+        max_score, max_intent = 0, None
+        for intent in [BotBrain.CLASSIFY_ASK_QUESTION, BotBrain.CLASSIFY_SUMMARY]:
+            # TODO: adjust this threshold to other answers
+            if scores[intent] > 0.8:
+                if max_score < scores[intent + '_max']:
+                    max_score = scores[intent + '_max']
+                    max_intent = intent
+        print(max_intent, max_score)
+        if max_intent is not None and max_score > 0.95:
+            return max_intent
+        return None
 
     def _send_message(self, text, reply_markup=None):
         text = text.strip()

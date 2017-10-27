@@ -2,6 +2,7 @@ import numpy as np
 from nltk.corpus import stopwords
 from nltk import word_tokenize
 
+
 class IntentClassifier:
     def __init__(self, path_to_datafile='./data/data.tsv', path_to_embedding='./data/glove.6B.50d.txt'):
         print('Loading embeddings: {}'.format(path_to_embedding))

@@ -5,6 +5,8 @@
 - Min. 4 Gb RAM + Swap (4 Gb), recommended 8 Gb RAM
 - Tested on Ubuntu 16.04
 
+- GloVe can be downloaded here: https://nlp.stanford.edu/projects/glove/
+
 # Configure
 
 `cp dialog_tracker/config.example.py dialog_tracker/config.py`
