@@ -663,16 +663,10 @@ class BotBrain:
 
     def _get_intent(self, text):
         scores = self.intent_classifier.get_scores(text)
-        print(scores)
-        max_score, max_intent = 0, None
-        for intent in [BotBrain.CLASSIFY_ASK_QUESTION, BotBrain.CLASSIFY_SUMMARY]:
-            # TODO: adjust this threshold to other answers
-            if scores[intent] > 0.8:
-                if max_score < scores[intent + '_max']:
-                    max_score = scores[intent + '_max']
-                    max_intent = intent
-        print(max_intent, max_score)
-        if max_intent is not None and max_score > 0.95:
+        max_intent, max_intent_score = self.intent_classifier.knn(text)
+        print(scores, max_intent, max_intent_score)
+        # TODO: adjust this threshold to other answers
+        if max_intent_score > 0.95:
             return max_intent
         return None
 

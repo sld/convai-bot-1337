@@ -58,3 +58,23 @@ class IntentClassifier:
 
     def score(self, a, b):
         return self._cosine_distance(self._sent_to_emb(a), self._sent_to_emb(b))
+
+    def knn(self, sent, k=5):
+        """
+        :return: max_class and max_score for max_class
+        """
+        assert k % 2 != 0
+        sent_embedded = self._sent_to_emb(sent)
+        scores = []
+        for cl in self.data:
+            for cl_s in self.data[cl]:
+                score = self._cosine_distance(cl_s['emb'], sent_embedded)
+                scores.append((cl, cl_s['text'], score))
+        scores = list(sorted(scores, key=lambda x: x[2], reverse=True))
+        votes_count = {cl: len(list(filter(lambda x: x[0]==cl, scores[:k]))) for cl in self.data}
+        max_class, max_votes = None, 0
+        for cl in votes_count:
+            if max_votes < votes_count[cl]:
+                max_votes = votes_count[cl]
+                max_class = cl
+        return max_class, max(map(lambda x: x[2], filter(lambda x: x[0]==max_class, scores)))
