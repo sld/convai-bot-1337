@@ -1,19 +1,19 @@
-import logging
-import threading
-import telegram
 import itertools
+import logging
 import random
-import subprocess
-import requests
 import re
-import config
+import subprocess
+import threading
 
+import config
+import requests
+from from_opennmt_chitchat.get_reply import normalize, detokenize
 from fuzzywuzzy import fuzz
 from nltk import word_tokenize
-from from_opennmt_chitchat.get_reply import normalize, detokenize
+from nltk.corpus import stopwords
 from transitions.extensions import LockedMachine as Machine
-from telegram.utils import request
 
+from intent_classifier.intent_classifier import IntentClassifier
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -68,6 +68,7 @@ class BotBrain:
 
     CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
     FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
+    SUMMARIZER_URL = 'tcp://opennmtsummary:5556'
     BIGARTM_URL = 'http://bigartm:3000'
 
     CLASSIFY_ANSWER = 'ca'
@@ -76,6 +77,8 @@ class BotBrain:
     CLASSIFY_FB = 'cf'
     CLASSIFY_ASK_QUESTION = 'caq'
     CLASSIFY_ALICE = "calice"
+    CLASSIFY_SUMMARY = "csummary"
+
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=BotBrain.states, initial='init')
@@ -84,11 +87,11 @@ class BotBrain:
         self.machine.add_transition('start_convai', 'init', 'started', after='wait_for_user_typing_convai')
         self.machine.add_transition('ask_question', 'started', 'asked', after='ask_question_to_user')
 
-        self.machine.add_transition('classify', 'started', 'classifying', after='get_klass_of_user_message')
-        self.machine.add_transition('classify', 'asked', 'classifying', after='get_klass_of_user_message')
-        self.machine.add_transition('classify', 'waiting', 'classifying', after='get_klass_of_user_message')
-        self.machine.add_transition('classify', 'classifying', 'classifying', after='get_klass_of_user_message')
-        self.machine.add_transition('classify', 'checking_answer', 'classifying', after='get_klass_of_user_message')
+        self.machine.add_transition('classify', 'started', 'classifying', after='get_class_of_user_message')
+        self.machine.add_transition('classify', 'asked', 'classifying', after='get_class_of_user_message')
+        self.machine.add_transition('classify', 'waiting', 'classifying', after='get_class_of_user_message')
+        self.machine.add_transition('classify', 'classifying', 'classifying', after='get_class_of_user_message')
+        self.machine.add_transition('classify', 'checking_answer', 'classifying', after='get_class_of_user_message')
 
         self.machine.add_transition('check_user_answer_on_asked', 'asked', 'checking_answer', after='checking_user_answer')
         self.machine.add_transition('check_user_answer', 'classifying', 'checking_answer', after='checking_user_answer')
@@ -100,13 +103,14 @@ class BotBrain:
         self.machine.add_transition('return_to_init', '*', 'init', after='clear_all')
 
         self.machine.add_transition('answer_to_user_question', 'classifying', 'bot_answering_question', after='answer_to_user_question_')
-        self.machine.add_transition('classify', 'bot_answering_question', 'classifying', after='get_klass_of_user_message')
+        self.machine.add_transition('classify', 'bot_answering_question', 'classifying', after='get_class_of_user_message')
         self.machine.add_transition('answer_to_user_question_correct', 'bot_answering_question', 'bot_correct_answer')
         self.machine.add_transition('answer_to_user_question_incorrect', 'bot_answering_question', 'bot_incorrect_answer')
 
         self.machine.add_transition('answer_to_user_replica', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_')
         self.machine.add_transition('answer_to_user_replica_with_fb', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_fb_')
         self.machine.add_transition('answer_to_user_replica_with_alice', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_alice_')
+        self.machine.add_transition('answer_to_user_with_summary', 'classifying', 'bot_answering_replica', after='answer_to_user_with_summary_')
 
         self.machine.add_transition('long_wait', 'asked', 'waiting', after='say_user_about_long_waiting')
         self.machine.add_transition('too_long_wait', 'waiting', 'waiting', after='say_user_about_long_waiting')
@@ -127,6 +131,10 @@ class BotBrain:
         self._is_first_incorrect = True
         # to prevent recursion call
         self._is_chitchat_replica_is_answer = False
+        # TODO: we can pass intent_classifier to _init_ method
+        # otherwise we have intent_classifier for each session
+        self.intent_classifier = IntentClassifier(path_to_datafile='./intent_classifier/data/data.tsv',
+                                                  path_to_embedding='./intent_classifier/data/glove.6B.100d.txt')
 
         self._setup_topics_info()
 
@@ -223,26 +231,29 @@ class BotBrain:
         if self._factoid_qas:
             qa = self._factoid_qas[0]
 
-        klass_to_string = {
+        class_to_string = {
             BotBrain.CLASSIFY_ASK_QUESTION: 'Factoid question',
             BotBrain.CLASSIFY_ANSWER: 'Answer to Factoid question',
             BotBrain.CLASSIFY_QUESTION: 'Factoid question from user',
             BotBrain.CLASSIFY_FB: 'Facebook seq2seq',
             BotBrain.CLASSIFY_REPLICA: 'OpenSubtitles seq2seq',
-            BotBrain.CLASSIFY_ALICE: 'Alice'
+            BotBrain.CLASSIFY_ALICE: 'Alice',
+            BotBrain.CLASSIFY_SUMMARY: 'Summary'
         }
 
         fb_replicas = process_tsv(self._get_opennmt_fb_reply(with_heuristic=False))
         opensubtitle_replicas = process_tsv(self._get_opennmt_chitchat_reply(with_heuristic=False))
         alice_replicas = [self._get_alice_reply()]
+        summaries = self._get_summaries()
 
         result = [
-            (klass_to_string[BotBrain.CLASSIFY_ASK_QUESTION], [qa]),
-            (klass_to_string[BotBrain.CLASSIFY_ANSWER], [answer]),
-            (klass_to_string[BotBrain.CLASSIFY_QUESTION], [None]),
-            (klass_to_string[BotBrain.CLASSIFY_FB], fb_replicas),
-            (klass_to_string[BotBrain.CLASSIFY_REPLICA], opensubtitle_replicas),
-            (klass_to_string[BotBrain.CLASSIFY_ALICE], alice_replicas),
+            (class_to_string[BotBrain.CLASSIFY_ASK_QUESTION], [qa]),
+            (class_to_string[BotBrain.CLASSIFY_ANSWER], [answer]),
+            (class_to_string[BotBrain.CLASSIFY_QUESTION], [None]),
+            (class_to_string[BotBrain.CLASSIFY_FB], fb_replicas),
+            (class_to_string[BotBrain.CLASSIFY_REPLICA], opensubtitle_replicas),
+            (class_to_string[BotBrain.CLASSIFY_ALICE], alice_replicas),
+            (class_to_string[BotBrain.CLASSIFY_SUMMARY], summaries),
             ('Common Responses', [self._select_from_common_responses()]),
             ('Topic Modelling', self._topics_info)
         ]
@@ -318,10 +329,20 @@ class BotBrain:
         res = str(output, "utf-8").strip()
         logger.info(res)
 
+        # TODO: make more clever classification
         if ('ask me' in text or 'discuss with me' in text or 'talk with me' in text \
             or 'ask question' in text or 'ask a question' in text or 'next question' in text) \
             and ("n't" not in text and 'not' not in text):
             return BotBrain.CLASSIFY_ASK_QUESTION
+
+        if ('text' in text or 'paragraph' in text or 'article' in text) and ('about' in text or 'summar' in text or 'short' in text) \
+            and ("n't" not in text and 'not' not in text):
+            return BotBrain.CLASSIFY_SUMMARY
+
+
+        intent = self._get_intent(text)
+        if intent is not None:
+            return intent
 
         logger.info('_classify: QUESTION ASKED: {}'.format(self._question_asked))
 
@@ -339,12 +360,12 @@ class BotBrain:
         elif res == '__label__4' or res == '__label__3': # TMP hack, because in some cases classifier returns label3 here
             return BotBrain.CLASSIFY_ALICE
 
-    def get_klass_of_user_message(self):
+    def get_class_of_user_message(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
-        klass = self._classify(self._last_user_message)
-        self._last_classify_label = klass
-        self._classify_user_utterance(klass)
+        message_class = self._classify(self._last_user_message)
+        self._last_classify_label = message_class
+        self._classify_user_utterance(message_class)
 
     def _classify_user_utterance(self, clf_type):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
@@ -367,6 +388,8 @@ class BotBrain:
             self.ask_question_after_classifying()
         elif clf_type == BotBrain.CLASSIFY_ALICE:
             self.answer_to_user_replica_with_alice()
+        elif clf_type == BotBrain.CLASSIFY_SUMMARY:
+            self.answer_to_user_with_summary()
 
     def _is_not_answer(self, reply):
         reply = normalize(reply)
@@ -506,6 +529,12 @@ class BotBrain:
         self._send_message(bots_answer)
         self.return_to_wait()
 
+    def answer_to_user_with_summary_(self):
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        bots_answer = self._get_summaries()
+        self._send_message(bots_answer)
+        self.return_to_wait()
+
     def _get_last_bot_reply(self):
         if len(self._dialog_context):
             return self._dialog_context[-1][1]
@@ -540,6 +569,8 @@ class BotBrain:
             return res
 
     def _get_best_response(self, tsv):
+        # score is perplexity: it can't describe quality of answer
+        # TODO: maybe make like in summarization? filter stopwords answers and take random
         best_score = -100000
         best_resp = ""
         for line in tsv.split('\n'):
@@ -567,6 +598,29 @@ class BotBrain:
             return True
         else:
             return False
+
+    def _get_stopwords_count(self, resp):
+        return len(list(filter(lambda x: x.lower() in stopwords.words('english'), word_tokenize(resp))))
+
+    def _get_summaries(self, with_heuristic=True):
+        text = self._text
+        logger.info("Send to opennmt summary: {}".format(text))
+        cmd = "echo \"{}\" | python from_opennmt_summary/get_reply.py {}".format(text, BotBrain.SUMMARIZER_URL)
+        ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = ps.communicate()[0]
+        res = str(output, "utf-8").strip()
+        logger.info("Got from opennmt summary: {}".format(res))
+        # now lets select one best response
+        candidates = []
+        for line in res.split('\n'):
+            _, resp, score = line.split('\t')
+            words_cnt = len(word_tokenize(resp))
+            print(resp, words_cnt, self._get_stopwords_count(resp))
+            if words_cnt >= 2 and self._get_stopwords_count(resp) / words_cnt < 0.5 and '<unk>' not in resp:
+                candidates.append(resp)
+        if len(candidates) > 0:
+            return random.choice(candidates)
+        return self._get_alice_reply()
 
     def _select_from_common_responses(self):
         msg1 = ['Do you know what?', '', "I don't understand :(", '¯\_(ツ)_/¯']
@@ -607,6 +661,20 @@ class BotBrain:
         else:
             return res
 
+    def _get_intent(self, text):
+        scores = self.intent_classifier.get_scores(text)
+        print(scores)
+        max_score, max_intent = 0, None
+        for intent in [BotBrain.CLASSIFY_ASK_QUESTION, BotBrain.CLASSIFY_SUMMARY]:
+            # TODO: adjust this threshold to other answers
+            if scores[intent] > 0.8:
+                if max_score < scores[intent + '_max']:
+                    max_score = scores[intent + '_max']
+                    max_intent = intent
+        print(max_intent, max_score)
+        if max_intent is not None and max_score > 0.95:
+            return max_intent
+        return None
 
     def _send_message(self, text, reply_markup=None):
         text = text.strip()
