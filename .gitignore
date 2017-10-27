@@ -19,3 +19,4 @@ facebook-news/
 dialog_tracker/data/evaluations/*.json
 topic-modelling/vw.wiki-en.txt
 topic-modelling/bigartm.*
+intent_classifier/data/glove.6B.100d.txt

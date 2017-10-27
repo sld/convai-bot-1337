@@ -13,8 +13,6 @@ from nltk import word_tokenize
 from nltk.corpus import stopwords
 from transitions.extensions import LockedMachine as Machine
 
-from intent_classifier.intent_classifier import IntentClassifier
-
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -79,6 +77,8 @@ class BotBrain:
     CLASSIFY_ALICE = "calice"
     CLASSIFY_SUMMARY = "csummary"
 
+    MESSAGE_CLASSIFIER_MODEL = "model_all_labels.ftz"
+
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=BotBrain.states, initial='init')
@@ -131,10 +131,6 @@ class BotBrain:
         self._is_first_incorrect = True
         # to prevent recursion call
         self._is_chitchat_replica_is_answer = False
-        # TODO: we can pass intent_classifier to _init_ method
-        # otherwise we have intent_classifier for each session
-        self.intent_classifier = IntentClassifier(path_to_datafile='./intent_classifier/data/data.tsv',
-                                                  path_to_embedding='./intent_classifier/data/glove.6B.100d.txt')
 
         self._setup_topics_info()
 
@@ -323,7 +319,7 @@ class BotBrain:
 
     def _classify(self, text):
         text = normalize(text)
-        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/model_all_labels.ftz -".format(text)
+        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/{} -".format(text, BotBrain.MESSAGE_CLASSIFIER_MODEL)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
@@ -393,7 +389,7 @@ class BotBrain:
 
     def _is_not_answer(self, reply):
         reply = normalize(reply)
-        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/model_all_labels.ftz -".format(reply)
+        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/{} -".format(reply, BotBrain.MESSAGE_CLASSIFIER_MODEL)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
         res = str(output, "utf-8").strip()
@@ -662,12 +658,14 @@ class BotBrain:
             return res
 
     def _get_intent(self, text):
-        scores = self.intent_classifier.get_scores(text)
-        max_intent, max_intent_score = self.intent_classifier.knn(text)
-        print(scores, max_intent, max_intent_score)
-        # TODO: adjust this threshold to other answers
-        if max_intent_score > 0.95:
-            return max_intent
+        url = 'http://intent_classifier:3000/get_intent'
+        r = requests.post(url, json={'text': text})
+
+        intent = r.json()['intent']
+        score = r.json()['score']
+
+        if score and score > 0.95:
+            return intent
         return None
 
     def _send_message(self, text, reply_markup=None):

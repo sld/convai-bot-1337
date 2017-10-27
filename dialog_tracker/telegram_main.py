@@ -301,6 +301,8 @@ class DialogTracker:
 if __name__ == '__main__':
     if argv[1] == 'test':
         token = "447990426:AAH4OvsshJi_YVEKDeoosaRlQYhbzNfwtDU"
+    elif argv[1] == 'test2':
+        token = "477391137:AAEZGxS3BVAcgglRZUXxDCedV_yVsYLPew4"
     else:
         token = "381793449:AAEogsUmzwqgBQiIz6OmdzWOY6iU_GwATeI"
     dt = DialogTracker(token)
