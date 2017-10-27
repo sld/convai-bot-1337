@@ -5,10 +5,6 @@ services:
     ports:
       - '5554:9000'
     restart: 'always'
-    deploy:
-      resources:
-        limits:
-          memory: 1024M
 
   opennmt:
     image: 'sld3/opennmt:latest'
@@ -22,10 +18,6 @@ services:
     ports:
       - '5556:5556'
     restart: 'always'
-    deploy:
-      resources:
-        limits:
-          memory: 512M
 
   opennmtchitchat:
     image: 'sld3/opennmt:611e636_distro5beb83'
@@ -69,10 +61,7 @@ services:
     ports:
       - '1995:1995'
     restart: 'always'
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+
   alice:
     build:
       context: './ALICEChatAPI/'
@@ -81,10 +70,7 @@ services:
       - './ALICEChatAPI:/src'
     command: python -u server.py
     restart: 'always'
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+
   bigartm:
     build:
       context: './topic-modelling/'
@@ -92,10 +78,17 @@ services:
     volumes:
       - './topic-modelling:/src'
     command: gunicorn -w 4 -b 0.0.0.0:3000 server:app
-    ports:
-      - '3000:3000'
+    expose:
+      - '3000'
     restart: 'always'
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+
+  intent_classifier:
+    build:
+      context: './intent_classifier/'
+    image: 'sld3/intent_classifier:0.1.0'
+    volumes:
+      - './intent_classifier:/src'
+    command: gunicorn -w 1 -b 0.0.0.0:3000 server:app # Only 1 worker, beacuse a lot of ram required
+    expose:
+      - '3000'
+    restart: 'always'
