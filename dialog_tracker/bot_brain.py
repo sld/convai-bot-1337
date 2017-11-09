@@ -76,6 +76,7 @@ class BotBrain:
     CLASSIFY_ASK_QUESTION = 'caq'
     CLASSIFY_ALICE = "calice"
     CLASSIFY_SUMMARY = "csummary"
+    CLASSIFY_TOPIC = "ctopic"
 
     MESSAGE_CLASSIFIER_MODEL = "model_all_labels.ftz"
 
@@ -111,6 +112,7 @@ class BotBrain:
         self.machine.add_transition('answer_to_user_replica_with_fb', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_fb_')
         self.machine.add_transition('answer_to_user_replica_with_alice', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_alice_')
         self.machine.add_transition('answer_to_user_with_summary', 'classifying', 'bot_answering_replica', after='answer_to_user_with_summary_')
+        self.machine.add_transition('answer_to_user_with_topic', 'classifying', 'bot_answering_replica', after='answer_to_user_with_topic_')
 
         self.machine.add_transition('long_wait', 'asked', 'waiting', after='say_user_about_long_waiting')
         self.machine.add_transition('too_long_wait', 'waiting', 'waiting', after='say_user_about_long_waiting')
@@ -143,9 +145,12 @@ class BotBrain:
         # last asked factoid qas
         self._last_factoid_qas = None
 
+    def _get_topics_response(self):
+        return random.sample(self._best_additionals, k=1)[0]
+
     def _setup_topics_info(self):
         def _send_additional():
-            response = random.sample(self._best_additionals, k=1)[0]
+            response = self._get_topics_response()
             print(["topic additinonal", response])
             self._send_message(response)
 
@@ -155,9 +160,8 @@ class BotBrain:
             print("Topics result: {}".format(self._topics_info))
             self._best_additionals = self._topics_info[0]['responses']
 
-            t = threading.Timer(1, _send_additional)
-            t.start()
-            # self._threads.append(t)
+            self._topic_thread = threading.Timer(1, _send_additional)
+            self._topic_thread.start()
 
     def set_text_and_qa(self, text_and_qa):
         self._text_and_qa = text_and_qa
@@ -165,7 +169,7 @@ class BotBrain:
         self._setup_topics_info()
 
     def wait_for_user_typing(self):
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        self._cancel_timer_threads(presereve_cntr=False, reset_question=False, reset_seq2seq_context=False, reset_topic=False)
 
         def _ask_question_if_user_inactive():
             if self.is_started():
@@ -249,7 +253,7 @@ class BotBrain:
             (class_to_string[BotBrain.CLASSIFY_FB], fb_replicas),
             (class_to_string[BotBrain.CLASSIFY_REPLICA], opensubtitle_replicas),
             (class_to_string[BotBrain.CLASSIFY_ALICE], alice_replicas),
-            (class_to_string[BotBrain.CLASSIFY_SUMMARY], summaries),
+            (class_to_string[BotBrain.CLASSIFY_SUMMARY], [summaries]),
             ('Common Responses', [self._select_from_common_responses()]),
             ('Topic Modelling', self._topics_info)
         ]
@@ -301,7 +305,7 @@ class BotBrain:
         self._threads.append(t)
 
     def wait_for_user_typing_convai(self):
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False, reset_topic=False)
 
         def _ask_question_if_user_inactive():
             if self.is_started():
@@ -386,6 +390,8 @@ class BotBrain:
             self.answer_to_user_replica_with_alice()
         elif clf_type == BotBrain.CLASSIFY_SUMMARY:
             self.answer_to_user_with_summary()
+        elif clf_type == BotBrain.CLASSIFY_TOPIC:
+            self.answer_to_user_with_topic()
 
     def _is_not_answer(self, reply):
         reply = normalize(reply)
@@ -528,6 +534,12 @@ class BotBrain:
     def answer_to_user_with_summary_(self):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
         bots_answer = self._get_summaries()
+        self._send_message(bots_answer)
+        self.return_to_wait()
+
+    def answer_to_user_with_topic_(self):
+        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        bots_answer = self._get_topics_response()
         self._send_message(bots_answer)
         self.return_to_wait()
 
@@ -682,12 +694,15 @@ class BotBrain:
         text = text.replace('"', " ").replace("`", " ").replace("'", " ")
         self._dialog_context.append((self._last_user_message, text))
 
-    def _cancel_timer_threads(self, presereve_cntr=False, reset_question=True, reset_seq2seq_context=True):
+    def _cancel_timer_threads(self, presereve_cntr=False, reset_question=True, reset_seq2seq_context=True, reset_topic=True):
         if not presereve_cntr:
             self._too_long_waiting_cntr = 0
 
         if reset_question:
             self._question_asked = False
+
+        if reset_topic:
+            self._topic_thread.cancel()
 
         [t.cancel() for t in self._threads]
 
@@ -697,4 +712,4 @@ class BotBrain:
         return s
 
     def clear_all(self):
-        self._cancel_timer_threads()
+        self._cancel_timer_threads(reset_topic=False)

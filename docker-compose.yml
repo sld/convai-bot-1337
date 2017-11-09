@@ -4,7 +4,7 @@ services:
     image: 'sld3/corenlp:3.6.0'
     ports:
       - '5554:9000'
-    restart: 'always'
+    restart: 'unless-stopped'
 
   opennmt:
     image: 'sld3/opennmt:latest'
@@ -17,7 +17,7 @@ services:
       - corenlp
     ports:
       - '5556:5556'
-    restart: 'always'
+    restart: 'unless-stopped'
 
   opennmtchitchat:
     image: 'sld3/opennmt:611e636_distro5beb83'
@@ -29,7 +29,7 @@ services:
       -beam_size 12 -replace_unk false"
     ports:
       - '5557:5556'
-    restart: 'always'
+    restart: 'unless-stopped'
 
   opennmtsummary:
     image: 'sld3/opennmt:611e636_distro5beb83'
@@ -41,7 +41,7 @@ services:
       -beam_size 12 -replace_unk false"
     ports:
       - '5558:5556'
-    restart: 'always'
+    restart: 'unless-stopped'
 
 
   opennmtfbpost:
@@ -54,13 +54,13 @@ services:
       -beam_size 12 -replace_unk false"
     ports:
       - '5559:5556'
-    restart: 'always'
+    restart: 'unless-stopped'
 
   bidaf:
     image: 'sld3/bi-att-flow:0.1.0'
     ports:
       - '1995:1995'
-    restart: 'always'
+    restart: 'unless-stopped'
 
   alice:
     build:
@@ -69,7 +69,7 @@ services:
     volumes:
       - './ALICEChatAPI:/src'
     command: python -u server.py
-    restart: 'always'
+    restart: 'unless-stopped'
 
   bigartm:
     build:
@@ -80,7 +80,9 @@ services:
     command: gunicorn -w 4 -b 0.0.0.0:3000 server:app
     expose:
       - '3000'
-    restart: 'always'
+    restart: 'unless-stopped'
+    environment:
+      - PYTHONUNBUFFERED=1
 
   intent_classifier:
     build:
@@ -91,4 +93,6 @@ services:
     command: gunicorn -w 1 -b 0.0.0.0:3000 server:app # Only 1 worker, beacuse a lot of ram required
     expose:
       - '3000'
-    restart: 'always'
+    restart: 'unless-stopped'
+    environment:
+      - PYTHONUNBUFFERED=1

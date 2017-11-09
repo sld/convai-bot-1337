@@ -5,7 +5,7 @@ services:
       context: './dialog_tracker/'
     image: 'dialog_tracker:1'
     command: python json_api_main.py
-    restart: 'no'
+    restart: 'unless-stopped'
     volumes:
       - ./dialog_tracker:/src
     depends_on:
