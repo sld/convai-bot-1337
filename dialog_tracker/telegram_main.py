@@ -276,14 +276,18 @@ class DialogTracker:
     def _log_user(self, cmd, update):
         logger_bot.info("USER[{}]: {}".format(cmd, update.message.text))
 
+    def _create_fsm(self, update):
+        fsm = BotBrain(self._bot, update.effective_user, update.effective_chat, self._text_and_qa())
+        self._users_fsm[update.effective_user.id] = fsm
+        self._users[update.effective_user.id] = update.effective_user
+
     def _add_fsm_and_user(self, update, hard=False):
         if update.effective_user.id not in self._users_fsm:
-            fsm = BotBrain(self._bot, update.effective_chat, update.effective_user, self._text_and_qa())
-            self._users_fsm[update.effective_user.id] = fsm
-            self._users[update.effective_user.id] = update.effective_user
+            self._create_fsm(update)
         elif update.effective_user.id in self._users_fsm and hard:
-            self._users_fsm[update.effective_user.id].set_text_and_qa(self._text_and_qa())
             self._users_fsm[update.effective_user.id].clear_all()
+            del self._users_fsm[update.effective_user.id]
+            self._create_fsm(update)
 
     def _error(self, bot, update, error):
         logger.warn('Update "%s" caused error "%s"' % (update, error))

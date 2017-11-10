@@ -5,6 +5,7 @@ import os
 import sys
 import subprocess
 
+
 class Chatbot():
   def __init__(self):
     self._kernel = aiml.Kernel()
@@ -18,8 +19,8 @@ class Chatbot():
       value = parts[1]
       self._kernel.setBotPredicate(key, value)
 
-  def respond(self, input):
-    response = self._kernel.respond(input)
+  def respond(self, input, session_id):
+    response = self._kernel.respond(input, sessionID=session_id)
     return response
 
   def reset(self):

@@ -3,6 +3,8 @@
 from flask import Flask, request, jsonify
 from flask import render_template
 import ai
+import uuid
+
 
 app = Flask(__name__)
 
@@ -11,10 +13,11 @@ app = Flask(__name__)
 def respond():
     # bot.reset() not work
     user_sentences = request.json['sentences']
-    print(user_sentences)
     response = "..."
+    session_id = uuid.uuid4().hex
+    print(user_sentences, session_id)
     for s in user_sentences:
-        response = bot.respond(s).replace("\n", "")
+        response = bot.respond(s, session_id).replace("\n", "")
     return jsonify({'message': response})
 
 if __name__ == '__main__':

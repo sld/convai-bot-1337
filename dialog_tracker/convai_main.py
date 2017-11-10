@@ -96,14 +96,18 @@ class DialogTracker:
     def _log_user(self, cmd, update):
         logger_bot.info("USER[{}]: {}".format(cmd, update.message.text))
 
+    # TODO: Merge this method with telegram_main
     def _add_fsm_and_user(self, update, hard=False):
         if update.effective_chat.id not in self._chat_fsm:
             fsm = BotBrain(self._bot, update.effective_user, update.effective_chat, self._text_and_qa())
             self._chat_fsm[update.effective_chat.id] = fsm
             self._users[update.effective_user.id] = update.effective_user
         elif update.effective_user.id in self._chat_fsm and hard:
-            self._chat_fsm[update.effective_chat.id].set_text_and_qa(self._text_and_qa())
             self._chat_fsm[update.effective_chat.id].clear_all()
+            del self._chat_fsm[update.effective_chat.id]
+            fsm = BotBrain(self._bot, update.effective_user, update.effective_chat, self._text_and_qa())
+            self._chat_fsm[update.effective_chat.id] = fsm
+            self._users[update.effective_user.id] = update.effective_user
 
     def _get_qas(self):
         out = subprocess.check_output(["from_question_generation/get_qnas", self._text])
