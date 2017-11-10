@@ -4,8 +4,8 @@ services:
     build:
       context: './dialog_tracker/'
     image: 'dialog_tracker:1'
-    command: python -u telegram_main.py test2
-    restart: 'always'
+    command: python -u telegram_main.py test
+    restart: 'unless-stopped'
     volumes:
       - ./dialog_tracker:/src
     depends_on:

@@ -7,7 +7,7 @@ topic_map = {
     "topic_0": "politics",
     "topic_1": "nationalities",
     "topic_2": "military",
-    "topic_3": "media",
+    "topic_3": "culture",
     "topic_4": "games",
     "topic_5": "biology",
     "topic_6": "engineering",
@@ -26,11 +26,11 @@ topic_map = {
 
 
 templates = [
-    "I like {}. And you?",
-    "Wow, {}, it is so about me!",
+    "I think this text is connected with {}",
+    "Am I right that topic of the text is {}?",
     "I guess this text about {}",
-    "Let's talk about {}",
-    "What do you think about {}?"
+    "Let's talk about {}. I think it is familiar with the text.",
+    "What do you think about {}? Is it semantically near with the text?"
 ]
 
 
