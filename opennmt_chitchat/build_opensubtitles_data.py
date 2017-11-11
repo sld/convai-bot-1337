@@ -24,7 +24,7 @@ def build_data(args):
     src_train, src_test, tgt_train, tgt_test = train_test_split(src, tgt, test_size=0.2, random_state=42)
 
     print('saving data...')
-    for filename, data in zip(['src.{}.train.txt', 'src.{}.test.txt', 'tgt.{}.train.txt', 'tgt.{}.train.txt' ], [src_train, src_test, tgt_train, tgt_test]):
+    for filename, data in zip(['src.{}.train.txt', 'src.{}.test.txt', 'tgt.{}.train.txt', 'tgt.{}.test.txt' ], [src_train, src_test, tgt_train, tgt_test]):
         with open(filename.format(args.n_prev_sent), 'w', encoding='utf8') as fout:
             for line in data:
                 fout.write(line + '\n')
