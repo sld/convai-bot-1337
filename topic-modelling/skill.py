@@ -27,9 +27,11 @@ topic_map = {
 
 templates = [
     "I think this text is connected with {}",
+    "I think this text is connected with {}. I can ask you a question about it.",
     "Am I right that topic of the text is {}?",
-    "I guess this text about {}",
+    "I guess this text about {}. I can ask you a question about it.",
     "Let's talk about {}. I think it is familiar with the text.",
+    "Let's talk about {}, or I can ask you a question about this text.",
     "What do you think about {}? Is it semantically near with the text?"
 ]
 

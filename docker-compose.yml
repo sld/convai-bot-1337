@@ -25,8 +25,8 @@ services:
       - './opennmt_chitchat/data/:/root/data'
     command: >
       bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0
-      -port 5556  -model /root/data/CPU_epoch5_14.62.t7
-      -beam_size 12 -replace_unk false"
+      -port 5556 -model /root/data/CPU_epoch5_14.62.t7
+      -beam_size 1 -replace_unk false"
     ports:
       - '5557:5556'
     restart: 'unless-stopped'
@@ -45,13 +45,13 @@ services:
 
 
   opennmtfbpost:
-    image: 'sld3/opennmt:611e636_distro5beb83'
+    image: 'sld3/opennmt:5e55e9d_distro5beb83'
     volumes:
       - './fbnews_chitchat/data/:/root/data'
     command: >
       bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0
-      -port 5556  -model /root/data/model_epoch18_93.23_release.t7
-      -beam_size 12 -replace_unk false"
+      -port 5556  -model /root/data/fbchichat_ver2_epoch9.t7
+      -beam_size 5 -replace_unk false -max_sent_length 20"
     ports:
       - '5559:5556'
     restart: 'unless-stopped'

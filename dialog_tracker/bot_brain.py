@@ -616,6 +616,11 @@ class BotBrain:
             if (self._dialog_context[-1][1] == self._last_user_message):
                 return True
 
+        words = word_tokenize(resp)
+        unique_words = set(words)
+        if len(words) > 10 and len(unique_words) / len(words) < 0.5:
+            return True
+
         if '<unk>' in resp or re.match('\w', resp) is None or ('youtube' in resp and 'www' in resp and 'watch' in resp):
             return True
         else:
@@ -641,7 +646,14 @@ class BotBrain:
             if words_cnt >= 2 and self._get_stopwords_count(resp) / words_cnt < 0.5 and '<unk>' not in resp:
                 candidates.append(resp)
         if len(candidates) > 0:
-            return random.choice(candidates)
+            summary = random.choice(candidates)
+            msg1 = ['I think this', 'I suppose that this', 'Maybe this']
+            msg2 = ['article', 'text', 'paragraph']
+            msg3 = ['can be described as:', 'can be summarized as:', 'main idea is:', 'in a nutshell is:']
+            msg4 = [summary]
+            msg5 = ['.', '...', '?', '..?']
+            msg = [msg1, msg2, msg3, msg4, msg5]
+            return combinate_and_return_answer(msg)
         return self._get_alice_reply()
 
 
