@@ -51,7 +51,7 @@ services:
     command: >
       bash -c "cd /root/opennmt && th tools/translation_server.lua -host 0.0.0.0
       -port 5556  -model /root/data/fbchichat_ver2_epoch9.t7
-      -beam_size 5 -replace_unk false"
+      -beam_size 5 -replace_unk false -max_sent_length 20"
     ports:
       - '5559:5556'
     restart: 'unless-stopped'
