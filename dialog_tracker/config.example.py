@@ -1,4 +1,4 @@
 WAIT_TIME = 30
 WAIT_TOO_LONG = 60
 CONVAI_WAIT_QUESTION = 5
-version = "15 (10.11.2017)"
+version = "16 (12.11.2017)"
