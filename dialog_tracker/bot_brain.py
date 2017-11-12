@@ -616,6 +616,11 @@ class BotBrain:
             if (self._dialog_context[-1][1] == self._last_user_message):
                 return True
 
+        words = word_tokenize(resp)
+        unique_words = set(words)
+        if len(words) > 10 and len(unique_words) / len(words) < 0.5:
+            return True
+
         if '<unk>' in resp or re.match('\w', resp) is None or ('youtube' in resp and 'www' in resp and 'watch' in resp):
             return True
         else:
