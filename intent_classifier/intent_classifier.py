@@ -2,6 +2,7 @@ import numpy as np
 from nltk.corpus import stopwords
 from nltk import word_tokenize
 
+import string
 
 class IntentClassifier:
     def __init__(self, path_to_datafile='./data/data.tsv', path_to_embedding='./data/glove.6B.100d.txt'):
@@ -34,7 +35,8 @@ class IntentClassifier:
         self.class_embds = {cl: np.mean(list(map(lambda x: x['emb'], self.data[cl])), axis=0) for cl in self.data}
 
     def _sent_to_emb(self, sent):
-        words = list(filter(lambda x: x not in self.stopwords, word_tokenize(sent.lower())))
+        sent = ''.join(filter(lambda x: x not in string.punctuation, sent.lower()))
+        words = list(filter(lambda x: x not in self.stopwords, word_tokenize(sent)))
         embds = [self.embeddings[w] for w in words if w in self.embeddings]
         if len(embds) == 0:
             return np.zeros_like(self.embeddings['test'])
