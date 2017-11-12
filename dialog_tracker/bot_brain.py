@@ -576,7 +576,8 @@ class BotBrain:
         else:
             return res
 
-    def _get_best_response(self, tsv):
+    def _get_best_response_legacy(self, tsv):
+        # legacy
         # score is perplexity: it can't describe quality of answer
         # TODO: maybe make like in summarization? filter stopwords answers and take random
         best_score = -100000
@@ -594,6 +595,19 @@ class BotBrain:
 
         logger.info("Best response is {}".format(best_resp))
         return best_resp
+
+    def _get_best_response(self, tsv):
+        candidates = []
+        for line in tsv.split('\n'):
+            _, resp, score = line.split('\t')
+            words_cnt = len(word_tokenize(resp))
+            print(resp, words_cnt, self._get_stopwords_count(resp), self._is_bad_resp(resp))
+            if words_cnt >= 1 and self._get_stopwords_count(resp) / words_cnt <= 0.75 and not self._is_bad_resp(resp):
+                candidates.append(resp)
+        print('candidates:', candidates)
+        if len(candidates) > 0:
+            return random.choice(candidates)
+        return self._get_alice_reply()
 
     def _is_bad_resp(self, resp):
         if len(self._dialog_context) > 1:
@@ -629,6 +643,7 @@ class BotBrain:
         if len(candidates) > 0:
             return random.choice(candidates)
         return self._get_alice_reply()
+
 
     def _select_from_common_responses(self):
         msg1 = ['Do you know what?', '', "I don't understand :(", '¯\_(ツ)_/¯']
