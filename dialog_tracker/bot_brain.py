@@ -84,42 +84,45 @@ class BotBrain:
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=BotBrain.states, initial='init')
 
+        # Start part
         self.machine.add_transition('start', 'init', 'started', after='wait_for_user_typing')
         self.machine.add_transition('start_convai', 'init', 'started', after='wait_for_user_typing_convai')
+
+        # Ask question if user do nothing part
         self.machine.add_transition('ask_question', 'started', 'asked', after='ask_question_to_user')
 
-        self.machine.add_transition('classify', 'started', 'classifying', after='get_class_of_user_message')
-        self.machine.add_transition('classify', 'asked', 'classifying', after='get_class_of_user_message')
-        self.machine.add_transition('classify', 'waiting', 'classifying', after='get_class_of_user_message')
-        self.machine.add_transition('classify', 'classifying', 'classifying', after='get_class_of_user_message')
-        self.machine.add_transition('classify', 'checking_answer', 'classifying', after='get_class_of_user_message')
+        # Classify user utterance part
+        self.machine.add_transition('classify', '*', 'classifying', after='get_class_of_user_message')
 
+        # Check user answer part
         self.machine.add_transition('check_user_answer_on_asked', 'asked', 'checking_answer', after='checking_user_answer')
-        self.machine.add_transition('check_user_answer', 'classifying', 'checking_answer', after='checking_user_answer')
         self.machine.add_transition('correct_user_answer', 'checking_answer', 'correct_answer')
         self.machine.add_transition('incorrect_user_answer', 'checking_answer', 'incorrect_answer')
         self.machine.add_transition('return_to_asked', 'incorrect_answer', 'asked')
+
         self.machine.add_transition('return_to_start', '*', 'started', after='wait_for_user_typing')
         self.machine.add_transition('return_to_wait', '*', 'waiting', after='say_user_about_long_waiting')
         self.machine.add_transition('return_to_init', '*', 'init', after='clear_all')
 
-        self.machine.add_transition('answer_to_user_question', 'classifying', 'bot_answering_question', after='answer_to_user_question_')
-        self.machine.add_transition('classify', 'bot_answering_question', 'classifying', after='get_class_of_user_message')
-        self.machine.add_transition('answer_to_user_question_correct', 'bot_answering_question', 'bot_correct_answer')
-        self.machine.add_transition('answer_to_user_question_incorrect', 'bot_answering_question', 'bot_incorrect_answer')
+        # Waiting part
+        self.machine.add_transition('long_wait', 'asked', 'waiting', after='say_user_about_long_waiting')
+        self.machine.add_transition('too_long_wait', 'waiting', 'waiting', after='say_user_about_long_waiting')
 
+        # Answer to user replica part - using different skills like fb, alice, q&a
+        self.machine.add_transition('answer_to_user_question', 'classifying', 'bot_answering_question', after='answer_to_user_question_')
         self.machine.add_transition('answer_to_user_replica', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_')
         self.machine.add_transition('answer_to_user_replica_with_fb', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_fb_')
         self.machine.add_transition('answer_to_user_replica_with_alice', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_alice_')
         self.machine.add_transition('answer_to_user_with_summary', 'classifying', 'bot_answering_replica', after='answer_to_user_with_summary_')
         self.machine.add_transition('answer_to_user_with_topic', 'classifying', 'bot_answering_replica', after='answer_to_user_with_topic_')
+        self.machine.add_transition('check_user_answer', 'classifying', 'checking_answer', after='checking_user_answer')
+        self.machine.add_transition('ask_question_after_classifying', 'classifying', 'asked', after='ask_question_to_user')
 
-        self.machine.add_transition('long_wait', 'asked', 'waiting', after='say_user_about_long_waiting')
-        self.machine.add_transition('too_long_wait', 'waiting', 'waiting', after='say_user_about_long_waiting')
+        # Bye part
         self.machine.add_transition('user_off', 'waiting', 'init', after='propose_conversation_ending')
 
+        # Ask question after waiting part
         self.machine.add_transition('ask_question_after_waiting', 'waiting', 'asked', after='ask_question_to_user')
-        self.machine.add_transition('ask_question_after_classifying', 'classifying', 'asked', after='ask_question_to_user')
 
         self._bot = bot
         self._user = user
