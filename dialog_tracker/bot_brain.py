@@ -80,6 +80,9 @@ class BotBrain:
 
     MESSAGE_CLASSIFIER_MODEL = "model_all_labels.ftz"
 
+    ASK_QUESTION_ON_WAIT_PROB = 0.5
+    MAX_WAIT_TURNS = 4
+
 
     def __init__(self, bot, user=None, chat=None, text_and_qa=None):
         self.machine = Machine(model=self, states=BotBrain.states, initial='init')
@@ -88,21 +91,22 @@ class BotBrain:
         self.machine.add_transition('start', 'init', 'started', after='wait_for_user_typing')
         self.machine.add_transition('start_convai', 'init', 'started', after='wait_for_user_typing_convai')
 
-        # Ask question if user do nothing part
+        # Ask question if user do nothing part - can be replaced with return_to_wait func
         self.machine.add_transition('ask_question', 'started', 'asked', after='ask_question_to_user')
 
-        # Check user answer part
+        # Check user answer part - what about deleting and using only classify part?
         self.machine.add_transition('check_user_answer_on_asked', 'asked', 'checking_answer', after='checking_user_answer')
         self.machine.add_transition('correct_user_answer', 'checking_answer', 'correct_answer')
         self.machine.add_transition('incorrect_user_answer', 'checking_answer', 'incorrect_answer')
         self.machine.add_transition('return_to_asked', 'incorrect_answer', 'asked')
 
+        # Ask question after waiting part
+        self.machine.add_transition('ask_question_after_waiting', 'waiting', 'asked', after='ask_question_to_user')
+
+        # Universal states
         self.machine.add_transition('return_to_start', '*', 'started', after='wait_for_user_typing')
         self.machine.add_transition('return_to_wait', '*', 'waiting', after='say_user_about_long_waiting')
         self.machine.add_transition('return_to_init', '*', 'init', after='clear_all')
-
-        # Ask question after waiting part
-        self.machine.add_transition('ask_question_after_waiting', 'waiting', 'asked', after='ask_question_to_user')
 
         # Classify user utterance part
         self.machine.add_transition('classify', '*', 'classifying', after='get_class_of_user_message')
@@ -117,7 +121,7 @@ class BotBrain:
         self.machine.add_transition('check_user_answer', 'classifying', 'checking_answer', after='checking_user_answer')
         self.machine.add_transition('ask_question_after_classifying', 'classifying', 'asked', after='ask_question_to_user')
 
-        # Bye part
+        # Too long wait part
         self.machine.add_transition('user_off', 'waiting', 'init', after='propose_conversation_ending')
 
         self._bot = bot
@@ -285,13 +289,13 @@ class BotBrain:
         self._cancel_timer_threads(reset_question=False, presereve_cntr=True, reset_seq2seq_context=False)
 
         def _too_long_waiting_if_user_inactive():
-            if self.is_waiting() and self._too_long_waiting_cntr < 4:
-                if random.random() > 0.5:
+            if self.is_waiting() and self._too_long_waiting_cntr < BotBrain.MAX_WAIT_TURNS:
+                if random.random() > BotBrain.ASK_QUESTION_ON_WAIT_PROB:
                     self.ask_question_after_waiting()
                 else:
                     self._send_message(random.sample(BotBrain.wait_messages, 1)[0])
                 self.return_to_wait()
-            elif self.is_waiting() and self._too_long_waiting_cntr > 3:
+            elif self.is_waiting() and self._too_long_waiting_cntr > BotBrain.MAX_WAIT_TURNS:
                 self.user_off()
                 self._too_long_waiting_cntr = 0
             else:
