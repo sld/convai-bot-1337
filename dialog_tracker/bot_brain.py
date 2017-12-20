@@ -91,9 +91,6 @@ class BotBrain:
         # Ask question if user do nothing part
         self.machine.add_transition('ask_question', 'started', 'asked', after='ask_question_to_user')
 
-        # Classify user utterance part
-        self.machine.add_transition('classify', '*', 'classifying', after='get_class_of_user_message')
-
         # Check user answer part
         self.machine.add_transition('check_user_answer_on_asked', 'asked', 'checking_answer', after='checking_user_answer')
         self.machine.add_transition('correct_user_answer', 'checking_answer', 'correct_answer')
@@ -104,9 +101,11 @@ class BotBrain:
         self.machine.add_transition('return_to_wait', '*', 'waiting', after='say_user_about_long_waiting')
         self.machine.add_transition('return_to_init', '*', 'init', after='clear_all')
 
-        # Waiting part
-        self.machine.add_transition('long_wait', 'asked', 'waiting', after='say_user_about_long_waiting')
-        self.machine.add_transition('too_long_wait', 'waiting', 'waiting', after='say_user_about_long_waiting')
+        # Ask question after waiting part
+        self.machine.add_transition('ask_question_after_waiting', 'waiting', 'asked', after='ask_question_to_user')
+
+        # Classify user utterance part
+        self.machine.add_transition('classify', '*', 'classifying', after='get_class_of_user_message')
 
         # Answer to user replica part - using different skills like fb, alice, q&a
         self.machine.add_transition('answer_to_user_question', 'classifying', 'bot_answering_question', after='answer_to_user_question_')
@@ -120,9 +119,6 @@ class BotBrain:
 
         # Bye part
         self.machine.add_transition('user_off', 'waiting', 'init', after='propose_conversation_ending')
-
-        # Ask question after waiting part
-        self.machine.add_transition('ask_question_after_waiting', 'waiting', 'asked', after='ask_question_to_user')
 
         self._bot = bot
         self._user = user
@@ -187,7 +183,7 @@ class BotBrain:
 
         def _too_long_waiting_if_user_inactive():
             if self.is_asked():
-                self.long_wait()
+                self.return_to_wait()
 
         if self._get_factoid_question() is not None:
             self._send_message(self._filter_seq2seq_output(self._last_factoid_qas['question']))
@@ -294,7 +290,7 @@ class BotBrain:
                     self.ask_question_after_waiting()
                 else:
                     self._send_message(random.sample(BotBrain.wait_messages, 1)[0])
-                self.too_long_wait()
+                self.return_to_wait()
             elif self.is_waiting() and self._too_long_waiting_cntr > 3:
                 self.user_off()
                 self._too_long_waiting_cntr = 0
