@@ -7,6 +7,7 @@ import threading
 
 import config
 import requests
+from skills import QuestionAndAnswer
 from from_opennmt_chitchat.get_reply import normalize, detokenize
 from fuzzywuzzy import fuzz
 from nltk import word_tokenize
@@ -141,6 +142,7 @@ class BotBrain:
 
     def _init_factoid_qas_and_text(self):
         # list of all questions and answers
+        self._qa_skill = QuestionAndAnswer(self._text_and_qa['qas'], self._user)
         self._factoid_qas = self._text_and_qa['qas']
         self._text = self._text_and_qa['text']
 
@@ -176,11 +178,21 @@ class BotBrain:
 
         def _ask_question_if_user_inactive():
             if self.is_started():
-                self.ask_question()
+                question = self._qa_skill.pop_question()
+                self._ask_question_skill(question)
+                # self.ask_question()
 
         t = threading.Timer(config.WAIT_TIME, _ask_question_if_user_inactive)
         t.start()
         self._threads.append(t)
+
+
+    def _ask_question_skill(self, question):
+        if question is not None:
+            self._send_message(self._filter_seq2seq_output(question))
+        else:
+            self._send_message(random.sample(BotBrain.wait_messages, 1)[0])
+            self.return_to_wait()
 
     def ask_question_to_user(self):
         self._cancel_timer_threads(reset_question=False, presereve_cntr=True)
