@@ -7,7 +7,7 @@ import threading
 
 import config
 import requests
-from skills import QuestionAndAnswer
+from skills.qa import QuestionAndAnswer
 from from_opennmt_chitchat.get_reply import normalize, detokenize
 from fuzzywuzzy import fuzz
 from nltk import word_tokenize
@@ -27,10 +27,10 @@ if not logger_bot.handlers:
 
 
 def combinate_and_return_answer(arr):
-        messages_product = list(itertools.product(*arr))
-        msg_arr = random.sample(messages_product, 1)[0]
-        msg = detokenize(" ".join(msg_arr))
-        return msg
+    messages_product = list(itertools.product(*arr))
+    msg_arr = random.sample(messages_product, 1)[0]
+    msg = detokenize(" ".join(msg_arr))
+    return msg
 
 
 # NOTE: Оставил тут, т.к. непонятно как добавлять в fsm.
@@ -92,18 +92,6 @@ class BotBrain:
         self.machine.add_transition('start', 'init', 'started', after='wait_for_user_typing')
         self.machine.add_transition('start_convai', 'init', 'started', after='wait_for_user_typing_convai')
 
-        # Ask question if user do nothing part - can be replaced with return_to_wait func
-        self.machine.add_transition('ask_question', 'started', 'asked', after='ask_question_to_user')
-
-        # Check user answer part - what about deleting and using only classify part?
-        self.machine.add_transition('check_user_answer_on_asked', 'asked', 'checking_answer', after='checking_user_answer')
-        self.machine.add_transition('correct_user_answer', 'checking_answer', 'correct_answer')
-        self.machine.add_transition('incorrect_user_answer', 'checking_answer', 'incorrect_answer')
-        self.machine.add_transition('return_to_asked', 'incorrect_answer', 'asked')
-
-        # Ask question after waiting part
-        self.machine.add_transition('ask_question_after_waiting', 'waiting', 'asked', after='ask_question_to_user')
-
         # Universal states
         self.machine.add_transition('return_to_start', '*', 'started', after='wait_for_user_typing')
         self.machine.add_transition('return_to_wait', '*', 'waiting', after='say_user_about_long_waiting')
@@ -119,8 +107,6 @@ class BotBrain:
         self.machine.add_transition('answer_to_user_replica_with_alice', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_alice_')
         self.machine.add_transition('answer_to_user_with_summary', 'classifying', 'bot_answering_replica', after='answer_to_user_with_summary_')
         self.machine.add_transition('answer_to_user_with_topic', 'classifying', 'bot_answering_replica', after='answer_to_user_with_topic_')
-        self.machine.add_transition('check_user_answer', 'classifying', 'checking_answer', after='checking_user_answer')
-        self.machine.add_transition('ask_question_after_classifying', 'classifying', 'asked', after='ask_question_to_user')
 
         # Too long wait part
         self.machine.add_transition('user_off', 'waiting', 'init', after='propose_conversation_ending')
@@ -178,38 +164,20 @@ class BotBrain:
 
         def _ask_question_if_user_inactive():
             if self.is_started():
-                question = self._qa_skill.pop_question()
-                self._ask_question_skill(question)
-                # self.ask_question()
+                question = self._qa_skill.ask_question()
+                self._post_process_and_send_skill_sent(question)
+                self.return_to_wait()
 
         t = threading.Timer(config.WAIT_TIME, _ask_question_if_user_inactive)
         t.start()
         self._threads.append(t)
 
-
-    def _ask_question_skill(self, question):
-        if question is not None:
-            self._send_message(self._filter_seq2seq_output(question))
+    def _post_process_and_send_skill_sent(self, sent):
+        if sent is not None:
+            self._send_message(self._filter_seq2seq_output(sent))
         else:
             self._send_message(random.sample(BotBrain.wait_messages, 1)[0])
             self.return_to_wait()
-
-    def ask_question_to_user(self):
-        self._cancel_timer_threads(reset_question=False, presereve_cntr=True)
-
-        def _too_long_waiting_if_user_inactive():
-            if self.is_asked():
-                self.return_to_wait()
-
-        if self._get_factoid_question() is not None:
-            self._send_message(self._filter_seq2seq_output(self._last_factoid_qas['question']))
-        else:
-            self._send_message(random.sample(BotBrain.wait_messages, 1)[0])
-            self.return_to_wait()
-
-        t = threading.Timer(config.WAIT_TOO_LONG, _too_long_waiting_if_user_inactive)
-        t.start()
-        self._threads.append(t)
 
     def generate_suggestions(self):
         # Блин, нужен колоссальный рефакторинг, сделаем после 12 ноября
@@ -243,8 +211,7 @@ class BotBrain:
         if self._last_factoid_qas and self._last_factoid_qas.get('answer'):
             answer = self._last_factoid_qas.get('answer')
 
-        if self._factoid_qas:
-            qa = self._factoid_qas[0]
+        qa = self._qa_skill._last_factoid_qas
 
         class_to_string = {
             BotBrain.CLASSIFY_ASK_QUESTION: 'Factoid question',
@@ -274,15 +241,6 @@ class BotBrain:
         ]
         return result
 
-    def _get_factoid_question(self):
-        if len(self._factoid_qas) == 0:
-            return None
-        # takes one question from list and removes it
-        self._question_asked = True
-        self._last_factoid_qas = self._factoid_qas[0]
-        self._factoid_qas = self._factoid_qas[1:]
-        return self._question_asked
-
     def _get_alice_reply(self):
         alice_url = 'http://alice:3000'
         user_sentences = [e[0] for e in self._dialog_context]
@@ -303,7 +261,8 @@ class BotBrain:
         def _too_long_waiting_if_user_inactive():
             if self.is_waiting() and self._too_long_waiting_cntr < BotBrain.MAX_WAIT_TURNS:
                 if random.random() > BotBrain.ASK_QUESTION_ON_WAIT_PROB:
-                    self.ask_question_after_waiting()
+                    question = self._qa_skill.ask_question()
+                    self._post_process_and_send_skill_sent(question)
                 else:
                     self._send_message(random.sample(BotBrain.wait_messages, 1)[0])
                 self.return_to_wait()
@@ -319,16 +278,6 @@ class BotBrain:
         t.start()
         self._threads.append(t)
 
-    def wait_for_user_typing_convai(self):
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False, reset_topic=False)
-
-        def _ask_question_if_user_inactive():
-            if self.is_started():
-                self.ask_question()
-
-        t = threading.Timer(config.CONVAI_WAIT_QUESTION, _ask_question_if_user_inactive)
-        t.start()
-        self._threads.append(t)
 
     def propose_conversation_ending(self):
         self._cancel_timer_threads()
@@ -344,35 +293,19 @@ class BotBrain:
         res = str(output, "utf-8").strip()
         logger.info(res)
 
-        # TODO: make more clever classification
-        if ('ask me' in text or 'discuss with me' in text or 'talk with me' in text \
-            or 'ask question' in text or 'ask a question' in text or 'next question' in text) \
-            and ("n't" not in text and 'not' not in text):
-            return BotBrain.CLASSIFY_ASK_QUESTION
-
-        if ('text' in text or 'paragraph' in text or 'article' in text) and ('about' in text or 'summar' in text or 'short' in text) \
-            and ("n't" not in text and 'not' not in text):
-            return BotBrain.CLASSIFY_SUMMARY
-
-
         intent = self._get_intent(text)
         if intent is not None:
             return intent
 
-        logger.info('_classify: QUESTION ASKED: {}'.format(self._question_asked))
-
-        if self._question_asked and self._is_user_answer_correct() >= 80:
-            return BotBrain.CLASSIFY_ANSWER
-
-        if self.is_asked():
-            return BotBrain.CLASSIFY_ANSWER
         if res == '__label__0':
             return BotBrain.CLASSIFY_REPLICA
         elif res == '__label__1':
             return BotBrain.CLASSIFY_QUESTION
         elif res == '__label__2':
             return BotBrain.CLASSIFY_FB
-        elif res == '__label__4' or res == '__label__3': # TMP hack, because in some cases classifier returns label3 here
+        elif res == '__label__3':
+            return BotBrain.CLASSIFY_ANSWER
+        elif res == '__label__4':
             return BotBrain.CLASSIFY_ALICE
 
     def get_class_of_user_message(self):
@@ -385,14 +318,10 @@ class BotBrain:
     def _classify_user_utterance(self, clf_type):
         self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
 
-        self._is_chitchat_replica_is_answer = False
-        if clf_type == BotBrain.CLASSIFY_ANSWER and self._question_asked:
-            self._is_chitchat_replica_is_answer = True
-            self.check_user_answer()
-        elif clf_type == BotBrain.CLASSIFY_ANSWER and not self._question_asked:
-            self._send_message(("I did not ask you a question. Then why do you think"
-                " it has the answer type? My last sentence is a rhetorical question 😋"))
-            self.return_to_start()
+        if clf_type == BotBrain.CLASSIFY_ANSWER:
+            msg = self._qa_skill.check_user_answer(self._last_user_message)
+            self._post_process_and_send_skill_sent(msg)
+            self.return_to_wait()
         elif clf_type == BotBrain.CLASSIFY_QUESTION:
             self.answer_to_user_question()
         elif clf_type == BotBrain.CLASSIFY_REPLICA:
@@ -400,112 +329,15 @@ class BotBrain:
         elif clf_type == BotBrain.CLASSIFY_FB:
             self.answer_to_user_replica_with_fb()
         elif clf_type == BotBrain.CLASSIFY_ASK_QUESTION:
-            self.ask_question_after_classifying()
+            question = self._qa_skill.ask_question()
+            self._post_process_and_send_skill_sent(question)
+            self.return_to_wait()
         elif clf_type == BotBrain.CLASSIFY_ALICE:
             self.answer_to_user_replica_with_alice()
         elif clf_type == BotBrain.CLASSIFY_SUMMARY:
             self.answer_to_user_with_summary()
         elif clf_type == BotBrain.CLASSIFY_TOPIC:
             self.answer_to_user_with_topic()
-
-    def _is_not_answer(self, reply):
-        reply = normalize(reply)
-        cmd = "echo \"{}\" | /fasttext/fasttext predict /src/data/{} -".format(reply, BotBrain.MESSAGE_CLASSIFIER_MODEL)
-        ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = ps.communicate()[0]
-        res = str(output, "utf-8").strip()
-        logger.info("Answer classification result: {}; Input: {}".format(res, reply))
-        if res == '__label__3':
-            return False
-        else:
-            return True
-
-    def _is_user_answer_correct(self):
-        true_answer = self._last_factoid_qas['answer']
-        # make user answer lowercased + remove ending chars
-        true_answer_clean = true_answer.lower().rstrip(' .,;?!')
-        user_answer_clean = self._last_user_message.lower().rstrip(' .,;?!')
-        sim = fuzz.ratio(true_answer_clean, user_answer_clean)
-        return sim
-
-    def checking_user_answer(self):
-        self._cancel_timer_threads(reset_question=False)
-
-        tokens_count = len(word_tokenize(self._last_user_message))
-        logger.info("#Checking_user_answer:_is_chitchat_replica_is_answer {}".format(self._is_chitchat_replica_is_answer))
-        if self._is_not_answer(self._last_user_message) and tokens_count > 2 and not self._is_chitchat_replica_is_answer:
-            self.classify()
-            return
-
-        true_answer = self._last_factoid_qas['answer']
-        sim = self._is_user_answer_correct()
-
-        if sim == 100:
-            msg = "👍"
-            if random.random() > 0.6:
-                msg1 = ['It is right', 'And its right answer', 'Right']
-                msg2 = ['!', ':)']
-                msg3 = ["You're smart.", ""]
-                msg4 = ["Ask me something or wait for my new question", "Ask me or wait my new question"]
-                msg5 = ["🌈", ":)", ""]
-                total_msg = [msg1, msg2, msg3, msg4, msg5]
-                msg = combinate_and_return_answer(total_msg)
-            self._send_message(msg)
-            self._question_asked = False
-            self.correct_user_answer()
-            self.return_to_start()
-        elif sim >= 80:
-            msg1 = ["I think you mean: {}".format(true_answer), "Did you mean {}?".format(true_answer)]
-            msg2 = ["My congratulations", "If you really mean what I think then my congratulations", "Good job"]
-            msg3 = ["!", "."]
-            msg4 = ["Ask me something or wait for my new question", "Ask me or wait my new question"]
-            msg5 = ["🌈", ":)", ""]
-            total_msg = [msg1, msg2, msg3, msg4, msg5]
-            msg = combinate_and_return_answer(total_msg)
-            self._send_message(msg)
-            self._question_asked = False
-            self.correct_user_answer()
-            self.return_to_start()
-        else:
-            self.incorrect_user_answer()
-            if self._is_first_incorrect is True:
-
-                msg1 = ["You can do better", "Show me your best", "It is incorrect"]
-                msg2 = [".", "!", ":)", '¯\_(ツ)_/¯']
-                if len(true_answer) > 3:
-                    msg3 = ["Hint: first 3 letters is {}.".format(true_answer[:3])]
-                else:
-                    msg3 = ["Hint: first 2 letters is {}.".format(true_answer[:2])]
-                msg4 = ["Try again", "Try again, please"]
-                msg5 = ["", "!", "."]
-                total_msg = [msg1, msg2, msg3, msg4, msg5]
-
-                msg = combinate_and_return_answer(total_msg)
-
-                self._send_message(msg)
-                self.return_to_asked()
-                self._is_first_incorrect = False
-            else:
-                msg = "😕"
-                if random.random() > 0.5:
-                    msg1 = ['Still incorrect', 'Incorrect', 'Maybe other time']
-                    msg2 = ['.', ':(']
-                    total_msg = [msg1, msg2]
-                    msg = combinate_and_return_answer(total_msg)
-
-                self._send_message(msg)
-
-                msg3 = ['I think that']
-                msg4 = ['correct answer', 'true answer', 'answer']
-                msg5 =  ['is: {}'.format(true_answer)]
-                msg6 = [":)", "", "."]
-                total_msg = [msg3, msg4, msg5, msg6]
-                msg = combinate_and_return_answer(total_msg)
-                self._send_message(msg)
-
-                self._question_asked = False
-                self.return_to_wait()
-                self._is_first_incorrect = True
 
     def answer_to_user_question_(self):
         self._cancel_timer_threads()
@@ -590,26 +422,6 @@ class BotBrain:
             return self._get_best_response(res)
         else:
             return res
-
-    def _get_best_response_legacy(self, tsv):
-        # legacy
-        # score is perplexity: it can't describe quality of answer
-        # TODO: maybe make like in summarization? filter stopwords answers and take random
-        best_score = -100000
-        best_resp = ""
-        for line in tsv.split('\n'):
-            _, resp, score = line.split('\t')
-            score = float(score)
-            if score > best_score and not self._is_bad_resp(resp):
-                best_score = score
-                best_resp = resp
-
-        if self._is_bad_resp(best_resp):
-            # best_resp = self._select_from_common_responses()
-            best_resp = self._get_alice_reply()
-
-        logger.info("Best response is {}".format(best_resp))
-        return best_resp
 
     def _get_best_response(self, tsv):
         candidates = []
@@ -718,7 +530,7 @@ class BotBrain:
         intent = r.json()['intent']
         score = r.json()['score']
 
-        if score and score > 0.95:
+        if score and score > 0.85:
             return intent
         return None
 

@@ -37,7 +37,6 @@ class DialogTracker:
         dp.add_handler(CommandHandler("start", self._start_cmd))
         dp.add_handler(CommandHandler("reset", self._reset_cmd))
         dp.add_handler(CommandHandler("stop", self._reset_cmd))
-        dp.add_handler(CommandHandler("factoid_question", self._factoid_question_cmd))
         dp.add_handler(CommandHandler("help", self._help_cmd))
         dp.add_handler(CommandHandler("text", self._text_cmd))
         dp.add_handler(CommandHandler("evaluation_start", self._evaluation_start_cmd))
@@ -100,24 +99,6 @@ class DialogTracker:
         reply_markup = telegram.InlineKeyboardMarkup(keyboard)
         update.message.reply_text('"Evaluate overall dialogue quality, please: "', reply_markup=reply_markup)
 
-    def _factoid_question_cmd(self, bot, update):
-        self._log_user('_factoid_question_cmd', update)
-
-        self._add_fsm_and_user(update)
-
-        username = self._user_name(update)
-        fsm = self._users_fsm[update.effective_user.id]
-        fsm._last_user_message = update.message.text
-
-        if fsm.is_init():
-            update.message.reply_text(
-                "{}, please type /start to begin the journey {}".format(username, telegram.Emoji.MOUNTAIN_RAILWAY)
-            )
-            update.message.reply_text("Also, you can type /help to get help")
-        else:
-            fsm.return_to_start()
-            fsm.ask_question()
-
     def _start_cmd(self, bot, update):
         self._log_user('_start_cmd', update)
 
@@ -140,7 +121,6 @@ class DialogTracker:
 
         message = ("/start - starts the chat\n"
                    "/text - shows current text to discuss\n"
-                   "/factoid_question - bot asks factoid question about text\n"
                    "/help - shows this message\n"
                    "/reset - reset the bot\n"
                    "/stop - stop the bot\n"
