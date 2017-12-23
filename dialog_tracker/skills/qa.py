@@ -12,13 +12,35 @@ def combinate_and_return_answer(arr):
     return msg
 
 
-class QuestionAndAnswer:
+class QuestionAskingSkill:
+    def __init__(self, qa_skill):
+        self._qa_skill = qa_skill
+
+    def predict(self, arg):
+        return self._qa_skill.ask_question()
+
+    def get_question():
+        return self._qa_skill._last_factoid_qas.get('question')
+
+
+class AnswerCheckingSkill:
+    def __init__(self, qa_skill):
+        self._qa_skill = qa_skill
+
+    def predict(self, user_answer):
+        return self._qa_skill.check_user_answer(user_answer)
+
+    def get_answer():
+        return self._qa_skill._last_factoid_qas.get('answer')
+
+
+class QuestionAskingAndAnswerCheckingSkill:
     def __init__(self, qas, user):
         self._user = user
         self._factoid_qas = qas
         self._question_asked = False
         # last asked factoid qas
-        self._last_factoid_qas = None
+        self._last_factoid_qas = {}
         self._is_first_incorrect = True
 
     def ask_question(self):

@@ -7,7 +7,7 @@ import threading
 
 import config
 import requests
-from skills.qa import QuestionAndAnswer
+import skills.qa as qa
 from from_opennmt_chitchat.get_reply import normalize, detokenize
 from fuzzywuzzy import fuzz
 from nltk import word_tokenize
@@ -89,6 +89,7 @@ class BotBrain:
         self.machine = Machine(model=self, states=BotBrain.states, initial='init')
 
         # Start part
+        # AFTER START, WAIT, ETC
         self.machine.add_transition('start', 'init', 'started', after='wait_for_user_typing')
         self.machine.add_transition('start_convai', 'init', 'started', after='wait_for_user_typing_convai')
 
@@ -101,12 +102,13 @@ class BotBrain:
         self.machine.add_transition('classify', '*', 'classifying', after='get_class_of_user_message')
 
         # Answer to user replica part - using different skills like fb, alice, q&a
-        self.machine.add_transition('answer_to_user_question', 'classifying', 'bot_answering_question', after='answer_to_user_question_')
-        self.machine.add_transition('answer_to_user_replica', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_')
-        self.machine.add_transition('answer_to_user_replica_with_fb', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_fb_')
-        self.machine.add_transition('answer_to_user_replica_with_alice', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_alice_')
-        self.machine.add_transition('answer_to_user_with_summary', 'classifying', 'bot_answering_replica', after='answer_to_user_with_summary_')
-        self.machine.add_transition('answer_to_user_with_topic', 'classifying', 'bot_answering_replica', after='answer_to_user_with_topic_')
+        # GET RID OF IT
+        # self.machine.add_transition('answer_to_user_question', 'classifying', 'bot_answering_question', after='answer_to_user_question_')
+        # self.machine.add_transition('answer_to_user_replica', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_')
+        # self.machine.add_transition('answer_to_user_replica_with_fb', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_fb_')
+        # self.machine.add_transition('answer_to_user_replica_with_alice', 'classifying', 'bot_answering_replica', after='answer_to_user_replica_with_alice_')
+        # self.machine.add_transition('answer_to_user_with_summary', 'classifying', 'bot_answering_replica', after='answer_to_user_with_summary_')
+        # self.machine.add_transition('answer_to_user_with_topic', 'classifying', 'bot_answering_replica', after='answer_to_user_with_topic_')
 
         # Too long wait part
         self.machine.add_transition('user_off', 'waiting', 'init', after='propose_conversation_ending')
@@ -128,13 +130,10 @@ class BotBrain:
 
     def _init_factoid_qas_and_text(self):
         # list of all questions and answers
-        self._qa_skill = QuestionAndAnswer(self._text_and_qa['qas'], self._user)
-        self._factoid_qas = self._text_and_qa['qas']
+        qa_skill = QuestionAndAnswer(self._text_and_qa['qas'], self._user)
+        self._question_ask_skill = QuestionAskingSkill(qa_skill)
+        self._answer_check_skill = AnswerCheckingSkill(qa_skill)
         self._text = self._text_and_qa['text']
-
-        self._question_asked = False
-        # last asked factoid qas
-        self._last_factoid_qas = None
 
     def _get_topics_response(self):
         return random.sample(self._best_additionals, k=1)[0]
@@ -159,14 +158,17 @@ class BotBrain:
         self._init_factoid_qas_and_text()
         self._setup_topics_info()
 
+    def _skill_exec_wrap(skill, arg=None):
+        result = skill.predict(arg)
+        self._post_process_and_send_skill_sent(result)
+        self.return_to_wait()
+
     def wait_for_user_typing(self):
-        self._cancel_timer_threads(presereve_cntr=False, reset_question=False, reset_seq2seq_context=False, reset_topic=False)
+        self._cancel_timer_threads(presereve_cntr=False, reset_seq2seq_context=False, reset_topic=False)
 
         def _ask_question_if_user_inactive():
             if self.is_started():
-                question = self._qa_skill.ask_question()
-                self._post_process_and_send_skill_sent(question)
-                self.return_to_wait()
+                _skill_exec_wrap(self._question_ask_skill)
 
         t = threading.Timer(config.WAIT_TIME, _ask_question_if_user_inactive)
         t.start()
@@ -207,11 +209,8 @@ class BotBrain:
             payload = sorted(payload, key=lambda x: x[1], reverse=True)[:3]
             return payload
 
-        answer = None
-        if self._last_factoid_qas and self._last_factoid_qas.get('answer'):
-            answer = self._last_factoid_qas.get('answer')
-
-        qa = self._qa_skill._last_factoid_qas
+        answer = self._answer_check_skill.get_answer()
+        question = self._question_ask_skill.get_question()
 
         class_to_string = {
             BotBrain.CLASSIFY_ASK_QUESTION: 'Factoid question',
@@ -229,7 +228,7 @@ class BotBrain:
         summaries = self._get_summaries()
 
         result = [
-            (class_to_string[BotBrain.CLASSIFY_ASK_QUESTION], [qa]),
+            (class_to_string[BotBrain.CLASSIFY_ASK_QUESTION], [question]),
             (class_to_string[BotBrain.CLASSIFY_ANSWER], [answer]),
             (class_to_string[BotBrain.CLASSIFY_QUESTION], [None]),
             (class_to_string[BotBrain.CLASSIFY_FB], fb_replicas),
@@ -256,13 +255,12 @@ class BotBrain:
         return msg
 
     def say_user_about_long_waiting(self):
-        self._cancel_timer_threads(reset_question=False, presereve_cntr=True, reset_seq2seq_context=False)
+        self._cancel_timer_threads(presereve_cntr=True, reset_seq2seq_context=False)
 
         def _too_long_waiting_if_user_inactive():
             if self.is_waiting() and self._too_long_waiting_cntr < BotBrain.MAX_WAIT_TURNS:
                 if random.random() > BotBrain.ASK_QUESTION_ON_WAIT_PROB:
-                    question = self._qa_skill.ask_question()
-                    self._post_process_and_send_skill_sent(question)
+                    self._skill_exec_wrap(self._question_ask_skill)
                 else:
                     self._send_message(random.sample(BotBrain.wait_messages, 1)[0])
                 self.return_to_wait()
@@ -309,35 +307,32 @@ class BotBrain:
             return BotBrain.CLASSIFY_ALICE
 
     def get_class_of_user_message(self):
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        self._cancel_timer_threads(reset_seq2seq_context=False)
 
         message_class = self._classify(self._last_user_message)
         self._last_classify_label = message_class
         self._classify_user_utterance(message_class)
 
     def _classify_user_utterance(self, clf_type):
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        self._cancel_timer_threads(reset_seq2seq_context=False)
 
         if clf_type == BotBrain.CLASSIFY_ANSWER:
-            msg = self._qa_skill.check_user_answer(self._last_user_message)
-            self._post_process_and_send_skill_sent(msg)
-            self.return_to_wait()
+            self._skill_exec_wrap(self._answer_check_skill)
         elif clf_type == BotBrain.CLASSIFY_QUESTION:
-            self.answer_to_user_question()
+            self.answer_to_user_question_()
+            # self.answer_to_user_question() # easy
         elif clf_type == BotBrain.CLASSIFY_REPLICA:
-            self.answer_to_user_replica()
+            self.answer_to_user_replica_() # easy
         elif clf_type == BotBrain.CLASSIFY_FB:
-            self.answer_to_user_replica_with_fb()
+            self.answer_to_user_replica_with_fb_() # easy
         elif clf_type == BotBrain.CLASSIFY_ASK_QUESTION:
-            question = self._qa_skill.ask_question()
-            self._post_process_and_send_skill_sent(question)
-            self.return_to_wait()
+            self._skill_exec_wrap(self._question_ask_skill)
         elif clf_type == BotBrain.CLASSIFY_ALICE:
-            self.answer_to_user_replica_with_alice()
+            self.answer_to_user_replica_with_alice_() # easy
         elif clf_type == BotBrain.CLASSIFY_SUMMARY:
-            self.answer_to_user_with_summary()
+            self.answer_to_user_with_summary_() # easy
         elif clf_type == BotBrain.CLASSIFY_TOPIC:
-            self.answer_to_user_with_topic()
+            self.answer_to_user_with_topic_() # easy
 
     def answer_to_user_question_(self):
         self._cancel_timer_threads()
@@ -361,31 +356,31 @@ class BotBrain:
         return str(out, "utf-8").strip()
 
     def answer_to_user_replica_(self):
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        self._cancel_timer_threads(reset_seq2seq_context=False)
         bots_answer = self._get_opennmt_chitchat_reply()
         self._send_message(bots_answer)
         self.return_to_wait()
 
     def answer_to_user_replica_with_fb_(self):
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        self._cancel_timer_threads(reset_seq2seq_context=False)
         bots_answer = self._get_opennmt_fb_reply()
         self._send_message(bots_answer)
         self.return_to_wait()
 
     def answer_to_user_replica_with_alice_(self):
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        self._cancel_timer_threads(reset_seq2seq_context=False)
         bots_answer = self._get_alice_reply()
         self._send_message(bots_answer)
         self.return_to_wait()
 
     def answer_to_user_with_summary_(self):
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        self._cancel_timer_threads(reset_seq2seq_context=False)
         bots_answer = self._get_summaries()
         self._send_message(bots_answer)
         self.return_to_wait()
 
     def answer_to_user_with_topic_(self):
-        self._cancel_timer_threads(reset_question=False, reset_seq2seq_context=False)
+        self._cancel_timer_threads(reset_seq2seq_context=False)
         bots_answer = self._get_topics_response()
         self._send_message(bots_answer)
         self.return_to_wait()
@@ -483,7 +478,6 @@ class BotBrain:
             return combinate_and_return_answer(msg)
         return self._get_alice_reply()
 
-
     def _select_from_common_responses(self):
         msg1 = ['Do you know what?', '', "I don't understand :(", '¯\_(ツ)_/¯']
         msg2 = ["I can't answer", "Its beyond my possibilities"]
@@ -548,12 +542,9 @@ class BotBrain:
         text = text.replace('"', " ").replace("`", " ").replace("'", " ")
         self._dialog_context.append((self._last_user_message, text))
 
-    def _cancel_timer_threads(self, presereve_cntr=False, reset_question=True, reset_seq2seq_context=True, reset_topic=True):
+    def _cancel_timer_threads(self, presereve_cntr=False, reset_seq2seq_context=True, reset_topic=True):
         if not presereve_cntr:
             self._too_long_waiting_cntr = 0
-
-        if reset_question:
-            self._question_asked = False
 
         if reset_topic:
             self._topic_thread.cancel()
