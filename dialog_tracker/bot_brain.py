@@ -130,9 +130,9 @@ class BotBrain:
 
     def _init_factoid_qas_and_text(self):
         # list of all questions and answers
-        qa_skill = QuestionAndAnswer(self._text_and_qa['qas'], self._user)
-        self._question_ask_skill = QuestionAskingSkill(qa_skill)
-        self._answer_check_skill = AnswerCheckingSkill(qa_skill)
+        qa_skill = qa.QuestionAskingAndAnswerCheckingSkill(self._text_and_qa['qas'], self._user)
+        self._question_ask_skill = qa.QuestionAskingSkill(qa_skill)
+        self._answer_check_skill = qa.AnswerCheckingSkill(qa_skill)
         self._text = self._text_and_qa['text']
 
     def _get_topics_response(self):
@@ -158,7 +158,7 @@ class BotBrain:
         self._init_factoid_qas_and_text()
         self._setup_topics_info()
 
-    def _skill_exec_wrap(skill, arg=None):
+    def _skill_exec_wrap(self, skill, arg=None):
         result = skill.predict(arg)
         self._post_process_and_send_skill_sent(result)
         self.return_to_wait()
@@ -317,7 +317,7 @@ class BotBrain:
         self._cancel_timer_threads(reset_seq2seq_context=False)
 
         if clf_type == BotBrain.CLASSIFY_ANSWER:
-            self._skill_exec_wrap(self._answer_check_skill)
+            self._skill_exec_wrap(self._answer_check_skill, self._last_user_message)
         elif clf_type == BotBrain.CLASSIFY_QUESTION:
             self.answer_to_user_question_()
             # self.answer_to_user_question() # easy
@@ -524,7 +524,7 @@ class BotBrain:
         intent = r.json()['intent']
         score = r.json()['score']
 
-        if score and score > 0.85:
+        if score and score > 0.9:
             return intent
         return None
 
