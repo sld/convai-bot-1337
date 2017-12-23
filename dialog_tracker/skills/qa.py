@@ -1,25 +1,18 @@
 import random
-import itertools
-from from_opennmt_chitchat.get_reply import detokenize
+import subprocess
+from skills.utils import combinate_and_return_answer
+from from_opennmt_chitchat.get_reply import detokenize, normalize
 from fuzzywuzzy import fuzz
-from nltk import word_tokenize
-
-
-def combinate_and_return_answer(arr):
-    messages_product = list(itertools.product(*arr))
-    msg_arr = random.sample(messages_product, 1)[0]
-    msg = detokenize(" ".join(msg_arr))
-    return msg
 
 
 class QuestionAskingSkill:
     def __init__(self, qa_skill):
         self._qa_skill = qa_skill
 
-    def predict(self, arg):
+    def predict(self, argument=None):
         return self._qa_skill.ask_question()
 
-    def get_question():
+    def get_question(self):
         return self._qa_skill._last_factoid_qas.get('question')
 
 
@@ -30,8 +23,30 @@ class AnswerCheckingSkill:
     def predict(self, user_answer):
         return self._qa_skill.check_user_answer(user_answer)
 
-    def get_answer():
+    def get_answer(self):
         return self._qa_skill._last_factoid_qas.get('answer')
+
+
+class QuestionAnswererSkill:
+    def __init__(self, text):
+        self._text = text
+
+    def predict(self, question):
+        answer = self._get_answer_to_factoid_question(question)
+
+        msg1 = ["I think that", "It seems that", "I'd like to say that"]
+        msg2 = ["correct answer", "answer", "true answer"]
+        msg3 = ["is: {}".format(detokenize(normalize(answer))).lower()]
+        total_msg = [msg1, msg2, msg3]
+
+        msg = combinate_and_return_answer(total_msg)
+        return msg
+
+    def _get_answer_to_factoid_question(self, question):
+        out = subprocess.check_output(
+            ["python3", "from_factoid_question_answerer/get_answer.py",
+             "--paragraph", self._text, "--question", question])
+        return str(out, "utf-8").strip()
 
 
 class QuestionAskingAndAnswerCheckingSkill:
@@ -63,7 +78,6 @@ class QuestionAskingAndAnswerCheckingSkill:
         return sim
 
     def check_user_answer(self, answer):
-        tokens_count = len(word_tokenize(answer))
         if not self._last_factoid_qas:
             return None
 
@@ -123,4 +137,3 @@ class QuestionAskingAndAnswerCheckingSkill:
                 self._question_asked = False
                 self._is_first_incorrect = True
         return msg
-

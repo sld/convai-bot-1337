@@ -196,8 +196,6 @@ class DialogTracker:
                 "{}, please type /start to begin the journey {}.".format(username, telegram.Emoji.MOUNTAIN_RAILWAY)
             )
             update.message.reply_text("Also, you can type /help to get help")
-        elif fsm.is_asked():
-            fsm.check_user_answer_on_asked()
         else:
             fsm.classify()
             if user_id in self._evaluation and self._evaluation[user_id]['is_running']:
