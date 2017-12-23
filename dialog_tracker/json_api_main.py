@@ -60,10 +60,7 @@ def message():
     fsm = chat_fsm[update.effective_chat.id]
     fsm._last_user_message = update.message.text
     fsm = chat_fsm[update.effective_chat.id]
-    if fsm.is_asked():
-        fsm.check_user_answer_on_asked()
-    else:
-        fsm.classify()
+    fsm.classify()
 
     message = fsm._dialog_context[-1][1]
 

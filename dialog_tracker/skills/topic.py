@@ -10,10 +10,13 @@ logger = logging.getLogger(__name__)
 
 class TopicSkill:
     def __init__(self, topic_url, text):
-        r = requests.post(topic_url + '/respond', json={'text': text})
-        topics_info = r.json()['result']
-        logger.info("Topics result: {}".format(topics_info))
-        self._topic_responses = topics_info[0]['responses']
+        if text:
+            r = requests.post(topic_url + '/respond', json={'text': text})
+            topics_info = r.json()['result']
+            logger.info("Topics result: {}".format(topics_info))
+            self._topic_responses = topics_info[0]['responses']
+        else:
+            self._topic_responses = [None]
 
     def predict(self, argument=None):
         return random.sample(self._topic_responses, k=1)[0]
