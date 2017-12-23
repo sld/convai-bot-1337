@@ -13,22 +13,20 @@ logger = logging.getLogger(__name__)
 
 
 class BaseChitChatSkill:
-    ALICE_URL = 'http://alice:3000'
-
     def __init__(self, chitchat_url):
         self._chitchat_url = chitchat_url
 
     def predict(self, current_sentence, dialog_context):
         raise NotImplementedError
 
-    def _get_best_response(self, tsv, is_bad_response):
+    def _get_best_response(self, tsv, current_sentence, dialog_context):
         candidates = []
         for line in tsv.split('\n'):
             _, resp, score = line.split('\t')
             words_cnt = len(word_tokenize(resp))
-            print(resp, words_cnt, get_stopwords_count(resp), is_bad_response)
             good_stopwords_ratio = get_stopwords_count(resp) / words_cnt <= 0.75
-            is_good_response = words_cnt >= 1 and good_stopwords_ratio and not is_bad_response
+            is_bad_response = self._is_bad_resp(line, current_sentence, dialog_context)
+            is_good_response = (words_cnt >= 1 and good_stopwords_ratio and not is_bad_response)
             if is_good_response:
                 candidates.append(resp)
         print('candidates:', candidates)
@@ -59,15 +57,16 @@ class AliceChitChatSkill(BaseChitChatSkill):
         return self._get_alice_reply(current_sentence, dialog_context)
 
     def _get_alice_reply(self, current_sentence, dialog_context):
-        # TODO: remove it from here, use as argument, and move alice reply to other place
-        alice_url = BaseChitChatSkill.ALICE_URL
+        if not current_sentence:
+            return None
+
         user_sentences = [e[0] for e in dialog_context]
         if dialog_context and dialog_context[-1][0] != current_sentence:
             user_sentences += [current_sentence]
         elif not dialog_context:
             user_sentences = [current_sentence]
         print("Alice input {}".format(user_sentences))
-        url = alice_url + '/respond'
+        url = self._chitchat_url + '/respond'
         r = requests.post(url, json={'sentences': user_sentences})
         print("Alice output: {}".format(r.json()))
         msg = r.json()['message']
@@ -101,8 +100,7 @@ class OpenSubtitlesChitChatSkill(BaseChitChatSkill):
         logger.info("Got from opennmt chitchat: {}".format(res))
 
         if with_heuristic:
-            is_bad_response = self._is_bad_resp(res, current_sentence, dialog_context)
-            return self._get_best_response(res, is_bad_response)
+            return self._get_best_response(res, current_sentence, dialog_context)
         else:
             return res
 
@@ -136,7 +134,6 @@ class FbChitChatSkill(BaseChitChatSkill):
         logger.info("Got from fb chitchat: {}".format(res))
 
         if with_heuristic:
-            is_bad_response = self._is_bad_resp(res, current_sentence, dialog_context)
-            return self._get_best_response(res, is_bad_response)
+            return self._get_best_response(res, current_sentence, dialog_context)
         else:
             return res

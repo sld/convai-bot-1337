@@ -107,7 +107,7 @@ class BotBrain:
         if result:
             self._send_message(self._filter_seq2seq_output(result))
         else:
-            result = self._alice_chitchat_skill.predict(*args)
+            result = self._alice_chitchat_skill.predict(self._last_user_message, self._dialog_context)
             if result:
                 self._send_message(self._filter_seq2seq_output(result))
             else:
@@ -143,9 +143,12 @@ class BotBrain:
         t.start()
         self._threads.append(t)
 
+    # Debug and human evaluation function (/evaluation_start mode in Telegram)
+    # Should be moved somewhere else
     def generate_suggestions(self):
         def process_tsv(tsv):
             payload = []
+
             for line in tsv.split('\n'):
                 _, resp, score = line.split('\t')
                 score = float(score)
@@ -166,10 +169,16 @@ class BotBrain:
             BotBrain.CLASSIFY_SUMMARY: 'Summary'
         }
 
-        fb_replicas = process_tsv(self._get_opennmt_fb_reply(with_heuristic=False))
-        opensubtitle_replicas = process_tsv(self._get_opennmt_chitchat_reply(with_heuristic=False))
-        alice_replicas = [self._get_alice_reply()]
-        summaries = self._get_summaries()
+        raw_fb_response = self._fb_chitchat_skill._get_opennmt_fb_reply(
+            self._last_user_message, self._dialog_context, self._text, False
+        )
+        raw_opensub_response = self._opensub_chitchat_skill._get_opennmt_chitchat_reply(
+            self._last_user_message, self._dialog_context, False
+        )
+        fb_replicas = process_tsv(raw_fb_response)
+        opensubtitle_replicas = process_tsv(raw_opensub_response)
+        alice_replicas = [self._alice_chitchat_skill.predict(self._last_user_message, self._dialog_context)]
+        summaries = self._summarization_skill._get_summaries(False)
 
         result = [
             (class_to_string[BotBrain.CLASSIFY_ASK_QUESTION], [question]),
@@ -179,8 +188,7 @@ class BotBrain:
             (class_to_string[BotBrain.CLASSIFY_REPLICA], opensubtitle_replicas),
             (class_to_string[BotBrain.CLASSIFY_ALICE], alice_replicas),
             (class_to_string[BotBrain.CLASSIFY_SUMMARY], [summaries]),
-            ('Common Responses', [self._select_from_common_responses()]),
-            ('Topic Modelling', self._topics_info)
+            ('Topic Modelling', [self._topic_skill.predict()])
         ]
         return result
 

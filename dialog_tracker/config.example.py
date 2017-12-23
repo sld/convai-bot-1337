@@ -1,3 +1,4 @@
 WAIT_TIME = 15
 WAIT_TOO_LONG = 60
-version = "16 (12.11.2017)"
+version = "17 (24.11.2017)"
+telegram_token = "PUT YOUR TELEGRAM TOKEN HERE"

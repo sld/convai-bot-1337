@@ -4,7 +4,7 @@ import json
 import datetime
 
 from random import sample
-from config import version
+from config import version, telegram_token
 from time import sleep
 from bot_brain import BotBrain, greet_user
 from sys import argv
@@ -281,11 +281,6 @@ class DialogTracker:
 
 
 if __name__ == '__main__':
-    if argv[1] == 'test':
-        token = "447990426:AAH4OvsshJi_YVEKDeoosaRlQYhbzNfwtDU"
-    elif argv[1] == 'test2':
-        token = "477391137:AAEZGxS3BVAcgglRZUXxDCedV_yVsYLPew4"
-    else:
-        token = "381793449:AAEogsUmzwqgBQiIz6OmdzWOY6iU_GwATeI"
+    token = telegram_token
     dt = DialogTracker(token)
     dt.start()
