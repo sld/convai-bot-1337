@@ -8,7 +8,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 
-class TopicSkill:
+class TopicDetectionSkill:
     def __init__(self, topic_url, text):
         if text:
             r = requests.post(topic_url + '/respond', json={'text': text})

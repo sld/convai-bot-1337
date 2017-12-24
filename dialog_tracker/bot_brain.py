@@ -121,9 +121,9 @@ class BotBrain:
         qa_skill = qa.QuestionAskingAndAnswerCheckingSkill(self._text_and_qa['qas'], self._user)
         self._question_ask_skill = qa.QuestionAskingSkill(qa_skill)
         self._answer_check_skill = qa.AnswerCheckingSkill(qa_skill)
-        self._question_answerer_skill = qa.QuestionAnswererSkill(self._text)
+        self._question_answerer_skill = qa.QuestionAnsweringSkill(self._text)
         self._summarization_skill = summary.SummarizationSkill(self.SUMMARIZER_URL, self._text)
-        self._topic_skill = topic.TopicSkill(self.BIGARTM_URL, self._text)
+        self._topic_skill = topic.TopicDetectionSkill(self.BIGARTM_URL, self._text)
 
     def after_start(self):
         self._cancel_timer_threads(presereve_cntr=False)

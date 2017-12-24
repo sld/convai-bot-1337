@@ -23,13 +23,10 @@ class BaseChitChatSkill:
         candidates = []
         for line in tsv.split('\n'):
             _, resp, score = line.split('\t')
-            words_cnt = len(word_tokenize(resp))
-            good_stopwords_ratio = get_stopwords_count(resp) / words_cnt <= 0.75
             is_bad_response = self._is_bad_resp(line, current_sentence, dialog_context)
-            is_good_response = (words_cnt >= 1 and good_stopwords_ratio and not is_bad_response)
-            if is_good_response:
+            if not is_bad_response:
                 candidates.append(resp)
-        print('candidates:', candidates)
+        logger.info('candidates: {}'.format(candidates))
         if len(candidates) > 0:
             return random.choice(candidates)
         return None
@@ -44,6 +41,10 @@ class BaseChitChatSkill:
         words = word_tokenize(resp)
         unique_words = set(words)
         if len(words) > 10 and len(unique_words) / len(words) < 0.5:
+            return True
+
+        good_stopwords_ratio = (len(words) >= 1 and get_stopwords_count(resp) / len(words) <= 0.75)
+        if not good_stopwords_ratio:
             return True
 
         if '<unk>' in resp or re.match('\w', resp) is None or ('youtube' in resp and 'www' in resp and 'watch' in resp):
@@ -65,10 +66,10 @@ class AliceChitChatSkill(BaseChitChatSkill):
             user_sentences += [current_sentence]
         elif not dialog_context:
             user_sentences = [current_sentence]
-        print("Alice input {}".format(user_sentences))
+        logger.info("Alice input {}".format(user_sentences))
         url = self._chitchat_url + '/respond'
         r = requests.post(url, json={'sentences': user_sentences})
-        print("Alice output: {}".format(r.json()))
+        logger.info("Alice output: {}".format(r.json()))
         msg = r.json()['message']
         return msg
 

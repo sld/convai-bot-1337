@@ -27,7 +27,7 @@ class AnswerCheckingSkill:
         return self._qa_skill._last_factoid_qas.get('answer')
 
 
-class QuestionAnswererSkill:
+class QuestionAnsweringSkill:
     def __init__(self, text):
         self._text = text
 
