@@ -33,7 +33,7 @@ class SummarizationSkill:
         for line in res.split('\n'):
             _, resp, score = line.split('\t')
             words_cnt = len(word_tokenize(resp))
-            print(resp, words_cnt, get_stopwords_count(resp))
+            logger.info("Summarization skill info: {} {} {}".format(resp, words_cnt, get_stopwords_count(resp)))
             if words_cnt >= 2 and get_stopwords_count(resp) / words_cnt < 0.5 and '<unk>' not in resp:
                 candidates.append(resp)
         if len(candidates) > 0:
