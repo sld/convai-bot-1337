@@ -16,8 +16,4 @@ services:
       - bigartm
     ports:
       - '5000:5000'
-    deploy:
-      resources:
-        limits:
-          memory: 512M
 
