@@ -4,7 +4,7 @@ import json
 import datetime
 
 from random import sample
-from config import version
+from config import version, telegram_token
 from time import sleep
 from bot_brain import BotBrain, greet_user
 from sys import argv
@@ -37,7 +37,6 @@ class DialogTracker:
         dp.add_handler(CommandHandler("start", self._start_cmd))
         dp.add_handler(CommandHandler("reset", self._reset_cmd))
         dp.add_handler(CommandHandler("stop", self._reset_cmd))
-        dp.add_handler(CommandHandler("factoid_question", self._factoid_question_cmd))
         dp.add_handler(CommandHandler("help", self._help_cmd))
         dp.add_handler(CommandHandler("text", self._text_cmd))
         dp.add_handler(CommandHandler("evaluation_start", self._evaluation_start_cmd))
@@ -100,24 +99,6 @@ class DialogTracker:
         reply_markup = telegram.InlineKeyboardMarkup(keyboard)
         update.message.reply_text('"Evaluate overall dialogue quality, please: "', reply_markup=reply_markup)
 
-    def _factoid_question_cmd(self, bot, update):
-        self._log_user('_factoid_question_cmd', update)
-
-        self._add_fsm_and_user(update)
-
-        username = self._user_name(update)
-        fsm = self._users_fsm[update.effective_user.id]
-        fsm._last_user_message = update.message.text
-
-        if fsm.is_init():
-            update.message.reply_text(
-                "{}, please type /start to begin the journey {}".format(username, telegram.Emoji.MOUNTAIN_RAILWAY)
-            )
-            update.message.reply_text("Also, you can type /help to get help")
-        else:
-            fsm.return_to_start()
-            fsm.ask_question()
-
     def _start_cmd(self, bot, update):
         self._log_user('_start_cmd', update)
 
@@ -140,7 +121,6 @@ class DialogTracker:
 
         message = ("/start - starts the chat\n"
                    "/text - shows current text to discuss\n"
-                   "/factoid_question - bot asks factoid question about text\n"
                    "/help - shows this message\n"
                    "/reset - reset the bot\n"
                    "/stop - stop the bot\n"
@@ -216,8 +196,6 @@ class DialogTracker:
                 "{}, please type /start to begin the journey {}.".format(username, telegram.Emoji.MOUNTAIN_RAILWAY)
             )
             update.message.reply_text("Also, you can type /help to get help")
-        elif fsm.is_asked():
-            fsm.check_user_answer_on_asked()
         else:
             fsm.classify()
             if user_id in self._evaluation and self._evaluation[user_id]['is_running']:
@@ -303,11 +281,6 @@ class DialogTracker:
 
 
 if __name__ == '__main__':
-    if argv[1] == 'test':
-        token = "447990426:AAH4OvsshJi_YVEKDeoosaRlQYhbzNfwtDU"
-    elif argv[1] == 'test2':
-        token = "477391137:AAEZGxS3BVAcgglRZUXxDCedV_yVsYLPew4"
-    else:
-        token = "381793449:AAEogsUmzwqgBQiIz6OmdzWOY6iU_GwATeI"
+    token = telegram_token
     dt = DialogTracker(token)
     dt.start()

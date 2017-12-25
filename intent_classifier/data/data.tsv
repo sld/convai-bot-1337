@@ -30,6 +30,7 @@ caq	Give me next question
 caq	Ask me next question
 caq	Ask me another question
 caq	Ask me a question
+caq	Can you ask me a question
 caq	Any other questions
 caq	Can you talk to me
 caq	Talk to me
@@ -42,3 +43,6 @@ ctopic	Say me topic
 ctopic	Say me theme
 ctopic	This text main topics
 ctopic	What is the topic
+ctopic	What is this text about
+ctopic	What is this paragraph about
+ctopic	Short info about the text

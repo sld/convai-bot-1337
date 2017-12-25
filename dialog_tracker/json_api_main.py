@@ -60,10 +60,7 @@ def message():
     fsm = chat_fsm[update.effective_chat.id]
     fsm._last_user_message = update.message.text
     fsm = chat_fsm[update.effective_chat.id]
-    if fsm.is_asked():
-        fsm.check_user_answer_on_asked()
-    else:
-        fsm.classify()
+    fsm.classify()
 
     message = fsm._dialog_context[-1][1]
 
@@ -95,7 +92,7 @@ def add_fsm_and_user(update, bot, text_and_qa, hard=False):
         fsm = BotBrain(bot, update.effective_user, update.effective_chat, text_and_qa)
         chat_fsm[update.effective_chat.id] = fsm
     elif update.effective_user.id in chat_fsm and hard:
-        chat_fsm[update.effective_chat.id].set_text_and_qa(text_and_qa)
+        chat_fsm[update.effective_chat.id].reinit_text_based_skills_and_data(text_and_qa)
         chat_fsm[update.effective_chat.id].clear_all()
 
 

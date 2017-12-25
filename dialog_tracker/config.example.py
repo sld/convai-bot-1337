@@ -1,4 +1,4 @@
-WAIT_TIME = 30
+WAIT_TIME = 15
 WAIT_TOO_LONG = 60
-CONVAI_WAIT_QUESTION = 15
-version = "16 (12.11.2017)"
+version = "17 (24.12.2017)"
+telegram_token = "PUT YOUR TELEGRAM TOKEN HERE"
