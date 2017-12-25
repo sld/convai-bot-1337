@@ -5,7 +5,17 @@ from nltk import word_tokenize
 import string
 
 class IntentClassifier:
+    """
+    IntentClassfier is a knn classifier on mean word embeddings of words in sentence
+    """
     def __init__(self, path_to_datafile='./data/data.tsv', path_to_embedding='./data/glove.6B.100d.txt'):
+        """
+        Loads word embeddings and computes sentence mean word embedding vector
+
+        Args:
+            path_to_datafile: tsv file with classes and sentences
+            path_to_embedding: embeddings
+        """
         print('Loading embeddings: {}'.format(path_to_embedding))
         self.embeddings = None
         with open(path_to_embedding, 'r') as fin:
@@ -35,6 +45,14 @@ class IntentClassifier:
         self.class_embds = {cl: np.mean(list(map(lambda x: x['emb'], self.data[cl])), axis=0) for cl in self.data}
 
     def _sent_to_emb(self, sent):
+        """
+        computes mean word embedding of sentence filtering punctuation and stop words
+        Args:
+            sent: sentence
+
+        Returns:
+            mean word embedding
+        """
         sent = ''.join(filter(lambda x: x not in string.punctuation, sent.lower()))
         words = list(filter(lambda x: x not in self.stopwords, word_tokenize(sent)))
         embds = [self.embeddings[w] for w in words if w in self.embeddings]
@@ -63,7 +81,12 @@ class IntentClassifier:
 
     def knn(self, sent, k=5):
         """
-        :return: max_class and max_score for max_class
+        Args:
+            sent: sentence
+            k: number of nearest neighbours for knn
+
+        Returns:
+            max_class and max_score for max_class
         """
         assert k % 2 != 0
         sent_embedded = self._sent_to_emb(sent)

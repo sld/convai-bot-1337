@@ -9,7 +9,10 @@ import skills.qa as qa
 import skills.chitchat as chitchat
 import skills.summary as summary
 import skills.topic as topic
+
 from skills.utils import combinate_and_return_answer
+
+# TODO: Remove dependencies on from_* folders;
 from from_opennmt_chitchat.get_reply import normalize, detokenize
 from transitions.extensions import LockedMachine as Machine
 
@@ -38,6 +41,8 @@ def greet_user(bot, chat_id):
 
 
 class BotBrain:
+    """Main class that controls dialog flow"""
+
     states = ['init', 'started', 'waiting', 'classifying']
     wait_messages = [
         "What do you feel about the text?", "Do you like this text?",
@@ -48,11 +53,13 @@ class BotBrain:
         "What is your job?"
     ]
 
+    # TODO: move to config file?
     CHITCHAT_URL = 'tcp://opennmtchitchat:5556'
     FB_CHITCHAT_URL = 'tcp://opennmtfbpost:5556'
     SUMMARIZER_URL = 'tcp://opennmtsummary:5556'
     BIGARTM_URL = 'http://bigartm:3000'
     ALICE_URL = 'http://alice:3000'
+    INTENT_URL = 'http://intent_classifier:3000/get_intent'
 
     CLASSIFY_ANSWER = 'ca'
     CLASSIFY_QUESTION = 'cq'
@@ -63,6 +70,7 @@ class BotBrain:
     CLASSIFY_SUMMARY = "csummary"
     CLASSIFY_TOPIC = "ctopic"
 
+    # TODO: move to config file?
     MESSAGE_CLASSIFIER_MODEL = "model_all_labels.ftz"
 
     ASK_QUESTION_ON_WAIT_PROB = 0.5
@@ -274,9 +282,7 @@ class BotBrain:
             self._skill_exec_wrap(self._topic_skill)
 
     def _get_intent(self, text):
-        url = 'http://intent_classifier:3000/get_intent'
-        r = requests.post(url, json={'text': text})
-
+        r = requests.post(self.INTENT_URL, json={'text': text})
         intent = r.json()['intent']
         score = r.json()['score']
 

@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 class BaseChitChatSkill:
+    """
+    Base class for chit-chat skills
+    method predict should be implemented
+    """
+
     def __init__(self, chitchat_url):
         self._chitchat_url = chitchat_url
 
@@ -20,6 +25,10 @@ class BaseChitChatSkill:
         raise NotImplementedError
 
     def _get_best_response(self, tsv, current_sentence, dialog_context):
+        """Implements simple logic for selecting best response:
+            - filter bad responses
+            - select random response from filtered
+        """
         candidates = []
         for line in tsv.split('\n'):
             _, resp, score = line.split('\t')
@@ -32,6 +41,9 @@ class BaseChitChatSkill:
         return None
 
     def _is_bad_resp(self, resp, current_sentence, dialog_context):
+        """Logic for detecting bad responses"""
+
+        # filter duplicate responses
         if len(dialog_context) > 1:
             if (dialog_context[-2][1] == dialog_context[-1][1]):
                 return True
@@ -40,13 +52,16 @@ class BaseChitChatSkill:
 
         words = word_tokenize(resp)
         unique_words = set(words)
+        # filter short responses and with ununique words
         if len(words) > 10 and len(unique_words) / len(words) < 0.5:
             return True
 
+        # filter responses with a lot stopwords
         good_stopwords_ratio = (len(words) >= 1 and get_stopwords_count(resp) / len(words) <= 0.75)
         if not good_stopwords_ratio:
             return True
 
+        # filter responses with undesirable words
         if '<unk>' in resp or re.match('\w', resp) is None or ('youtube' in resp and 'www' in resp and 'watch' in resp):
             return True
         else:
@@ -94,6 +109,7 @@ class OpenSubtitlesChitChatSkill(BaseChitChatSkill):
             to_echo = "{}\n{}".format(to_echo, user_sent)
 
         logger.info("Send to opennmt chitchat: {}".format(to_echo))
+        # TODO: Remove dependencies on from_* folders;
         cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, self._chitchat_url)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
@@ -128,6 +144,7 @@ class FbChitChatSkill(BaseChitChatSkill):
             to_echo = "{}\n{}".format(to_echo, user_sent)
 
         logger.info("Send to fb chitchat: {}".format(to_echo))
+        # TODO: Remove dependencies on from_* folders;
         cmd = "echo \"{}\" | python from_opennmt_chitchat/get_reply.py {}".format(to_echo, self._chitchat_url)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]
