@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class SummarizationSkill:
+    """Responses with summary of a given wiki-text"""
     def __init__(self, summarization_url, text):
         self._summarization_url = summarization_url
         self._text = text
@@ -23,6 +24,7 @@ class SummarizationSkill:
         if not text:
             return None
         logger.info("Send to opennmt summary: {}".format(text))
+        # TODO: Remove dependencies on from_* folders;
         cmd = "echo \"{}\" | python from_opennmt_summary/get_reply.py {}".format(text, self._summarization_url)
         ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = ps.communicate()[0]

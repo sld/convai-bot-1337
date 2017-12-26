@@ -20,6 +20,7 @@ class ConnectionHandler:
 
 
 def map_brackets_fw(t):
+    """Preprocessing for brackets"""
     if t == '(':
         return '-lrb-'
     if t == ')':
@@ -27,6 +28,7 @@ def map_brackets_fw(t):
     return t
 
 def map_brackets_bw(t):
+    """Postprocessing for brackets"""
     if t == '-lrb-':
         return '('
     if t == '-rrb-':
@@ -34,6 +36,7 @@ def map_brackets_bw(t):
     return t
 
 def normalize(line):
+    """Tokenize and lowercase"""
     line = line.strip()
     tokens = [t.lower() for t in word_tokenize(line)]
     tokens = map(lambda x: map_brackets_fw(x), tokens)
@@ -51,17 +54,19 @@ def detokenize(line):
 
 def split_text_on_chunks(text, max_len=75, overlap=15):
     """
-    :param text: input text
-    :param max_len: max chunk length (in words)
-    :param overlap: length of chunks overlapping
-    :return: list of chunks
+    Args:
+        text: input text
+        max_len: max chunk length (in words)
+        overlap: length of chunks overlapping
+
+    Returns:
+        list of chunks
     """
     chunks = []
     tokens = normalize(text).split(' ')
     for i in range(0, len(tokens), overlap):
         chunks.append(' '.join(tokens[i: i + max_len]))
     return chunks
-
 
 if __name__ == '__main__':
     fin = sys.stdin

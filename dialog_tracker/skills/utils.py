@@ -1,5 +1,6 @@
 import itertools
 import random
+# TODO: Remove dependencies on from_* folders;
 from from_opennmt_chitchat.get_reply import detokenize
 from nltk import word_tokenize
 from nltk.corpus import stopwords

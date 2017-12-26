@@ -1,11 +1,13 @@
 import random
 import subprocess
 from skills.utils import combinate_and_return_answer
+# TODO: Remove dependencies on from_* folders;
 from from_opennmt_chitchat.get_reply import detokenize, normalize
 from fuzzywuzzy import fuzz
 
 
 class QuestionAskingSkill:
+    """Asks factoid question based on text"""
     def __init__(self, qa_skill):
         self._qa_skill = qa_skill
 
@@ -17,6 +19,7 @@ class QuestionAskingSkill:
 
 
 class AnswerCheckingSkill:
+    """Checks if user answer on asked question was right and responses"""
     def __init__(self, qa_skill):
         self._qa_skill = qa_skill
 
@@ -28,6 +31,7 @@ class AnswerCheckingSkill:
 
 
 class QuestionAnsweringSkill:
+    """Answers on users factoid question"""
     def __init__(self, text):
         self._text = text
 
@@ -43,6 +47,7 @@ class QuestionAnsweringSkill:
         return msg
 
     def _get_answer_to_factoid_question(self, question):
+        # TODO: Remove dependencies on from_* folders;
         out = subprocess.check_output(
             ["python3", "from_factoid_question_answerer/get_answer.py",
              "--paragraph", self._text, "--question", question])

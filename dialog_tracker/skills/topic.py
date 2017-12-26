@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class TopicDetectionSkill:
+    """Responses with topic of a given text"""
     def __init__(self, topic_url, text):
         if text:
             r = requests.post(topic_url + '/respond', json={'text': text})

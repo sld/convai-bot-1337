@@ -17,6 +17,14 @@ def respond():
 
 
 def _get_intent(text):
+    """
+    Args:
+        text: input utterance
+
+    Returns:
+        intent and its score
+
+    """
     scores = intent_classifier.get_scores(text)
     max_intent, max_intent_score = intent_classifier.knn(text)
     print(scores, max_intent, max_intent_score)
