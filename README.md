@@ -1,6 +1,6 @@
 # ConvAI bot#1337
 
-Skill-based Conversational Agent that took 1st place at 2017 NIPS convai.io challenge.
+Skill-based Conversational Agent that took 1st place at 2017 NIPS Conversational Intelligence Challenge (http://convai.io).
 
 We still update our Conversational Agent and the latest version could be found in master branch.
 
@@ -97,7 +97,7 @@ Please read CONTRIBUTING.md for details on our code of conduct, and the process 
 
 # License
 
-This project is licensed under the GPLv3 License - see the LICENSE.md file for details.
+This project is licensed under the GPLv3 License - see the LICENSE file for details.
 
 
 
