@@ -4,7 +4,7 @@ services:
     build:
       context: './dialog_tracker/'
     image: 'dialog_tracker:1'
-    command: python convai_main.py "https://ipavlov.mipt.ru/nipsrouter/F0690A4D-B999-46F0-AD14-C65C13F09C40"
+    command: python convai_main.py
     restart: 'unless-stopped'
     volumes:
       - ./dialog_tracker:/src

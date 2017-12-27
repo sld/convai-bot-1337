@@ -1,17 +1,13 @@
 import logging
-import telegram
-import json
 import api_wrappers.convai as convai_api
 import requests
 import os
 import subprocess
 
-from random import sample
 from time import sleep
-from bot_brain import BotBrain, combinate_and_return_answer, greet_user
+from bot_brain import BotBrain, greet_user
 from sys import argv
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
-from config import version
+from config import version, convai_token
 
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -119,6 +115,5 @@ class DialogTracker:
 
 
 if __name__ == '__main__':
-    bot_url = argv[1]
-    dt = DialogTracker(bot_url)
+    dt = DialogTracker(convai_token)
     dt.start()
