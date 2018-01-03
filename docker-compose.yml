@@ -90,7 +90,7 @@ services:
     image: 'sld3/intent_classifier:0.1.0'
     volumes:
       - './intent_classifier:/src'
-    command: gunicorn -w 1 -b 0.0.0.0:3000 server:app # Only 1 worker, beacuse a lot of ram required
+    command: gunicorn -w 1 -t 120 -b 0.0.0.0:3000 server:app # Only 1 worker, beacuse a lot of ram required
     expose:
       - '3000'
     restart: 'unless-stopped'
