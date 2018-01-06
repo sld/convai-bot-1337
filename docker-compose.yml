@@ -7,7 +7,7 @@ services:
     restart: 'unless-stopped'
 
   opennmt:
-    image: 'sld3/opennmt:latest'
+    image: 'sld3/opennmt:780979ab_distro20e52377'
     volumes:
       - './question_generation/data/:/root/data'
     command: >
@@ -20,7 +20,7 @@ services:
     restart: 'unless-stopped'
 
   opennmtchitchat:
-    image: 'sld3/opennmt:611e636_distro5beb83'
+    image: 'sld3/opennmt:780979ab_distro20e52377'
     volumes:
       - './opennmt_chitchat/data/:/root/data'
     command: >
@@ -32,7 +32,7 @@ services:
     restart: 'unless-stopped'
 
   opennmtsummary:
-    image: 'sld3/opennmt:611e636_distro5beb83'
+    image: 'sld3/opennmt:780979ab_distro20e52377'
     volumes:
       - './opennmt_summarization/models:/root/data'
     command: >
@@ -45,7 +45,7 @@ services:
 
 
   opennmtfbpost:
-    image: 'sld3/opennmt:5e55e9d_distro5beb83'
+    image: 'sld3/opennmt:780979ab_distro20e52377'
     volumes:
       - './fbnews_chitchat/data/:/root/data'
     command: >
