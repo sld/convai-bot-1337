@@ -2,7 +2,7 @@
 
 Skill-based Conversational Agent that took 1st place at 2017 NIPS Conversational Intelligence Challenge (http://convai.io).
 
-We still update our Conversational Agent and the latest version could be found in master branch.
+**We still update our Conversational Agent and the latest version could be found in our repository**: https://github.com/sld/convai-bot-1337
 
 Here is submitted to **ConvAI Finals version** of the Agent (on 12th November): https://github.com/sld/convai-bot-1337/tree/032d5f6f5cc127bb56d29f0f0c6bbc0487f98316
 
