@@ -86,10 +86,6 @@ Run the tests:
 python dialog_tracker/tests/test_json_api.py http://0.0.0.0:5000
 ```
 
-# Contributing
-
-Please read CONTRIBUTING.md for details on our code of conduct, and the process for submitting pull requests to us.
-
 # Authors
 
 - Idris Yusupov (http://github.com/sld)
