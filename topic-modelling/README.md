@@ -1,3 +1,25 @@
+# Requirements
+
+* bigartm, nltk
+* python 3.6
+
+# How to train
+
+```
+./train.sh # Training parameters is in there
+```
+
+# How to test
+
+```
+./predict_pipeline.sh ./test.txt
+python skill.py /tmp/pred-tm-83F18394
+```
+
+
+# Debug infor
+
+```
 TopTokens (TopTokens):
 #1: party(0.0085) law(0.0066) president(0.0055) court(0.0055) political(0.0053) minister(0.0047) act(0.0044) said(0.0032) rights(0.003) union(0.0028)
 #2: india(0.011) al(0.009) indian(0.0068) russian(0.0047) language(0.0044) temple(0.0041) bc(0.0039) greek(0.0038) king(0.0038) pakistan(0.0034)
@@ -83,17 +105,4 @@ SparsityPhi     = 0.82382
 SparsityTheta   = 0.49320
 Writing model predictions into wiki15+3topics.new.theta.txt... OK.
 OK.
-
-
-# Requirements
-
-* bigartm, nltk
-* python 3.6
-
-
-# How to test
-
-```
-./predict_pipeline.sh ./test.txt
-python skill.py /tmp/pred-tm-83F18394
 ```
