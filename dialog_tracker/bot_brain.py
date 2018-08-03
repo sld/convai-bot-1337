@@ -40,6 +40,19 @@ def greet_user(bot, chat_id):
     bot.send_message(chat_id=chat_id, text=msg)
 
 
+def check_spelling(text):
+    try:
+        res = requests.post(
+            BotBrain.SPELLCHECKER_URL,
+            json={"sentences": text}
+        )
+        assert res.status_code == 200
+        return res.json()['message']
+    except Exception as e:
+        logger.error("spellchecker exception {}".format(str(e)))
+        return text
+
+
 class BotBrain:
     """Main class that controls dialog flow"""
 
@@ -60,6 +73,7 @@ class BotBrain:
     BIGARTM_URL = 'http://bigartm:3000'
     ALICE_URL = 'http://alice:3000'
     INTENT_URL = 'http://intent_classifier:3000/get_intent'
+    SPELLCHECKER_URL = 'http://spellchecker:3050/respond'
 
     CLASSIFY_ANSWER = 'ca'
     CLASSIFY_QUESTION = 'cq'
@@ -69,6 +83,7 @@ class BotBrain:
     CLASSIFY_ALICE = "calice"
     CLASSIFY_SUMMARY = "csummary"
     CLASSIFY_TOPIC = "ctopic"
+    CLASSIFY_BYE = 'cbye'
 
     # TODO: move to config file?
     MESSAGE_CLASSIFIER_MODEL = "model_all_labels.ftz"
@@ -109,6 +124,7 @@ class BotBrain:
         self._opensub_chitchat_skill = chitchat.OpenSubtitlesChitChatSkill(BotBrain.CHITCHAT_URL)
         self._fb_chitchat_skill = chitchat.FbChitChatSkill(BotBrain.FB_CHITCHAT_URL)
         self._alice_chitchat_skill = chitchat.AliceChitChatSkill(BotBrain.ALICE_URL)
+        self._bye_skill = bye.ByeSkill()
 
     def _skill_exec_wrap(self, skill, *args):
         result = skill.predict(*args)
@@ -150,6 +166,10 @@ class BotBrain:
             t = threading.Timer(config.WAIT_TIME, _say_about_topic_if_user_inactive)
         t.start()
         self._threads.append(t)
+
+    def set_user_message(self, text):
+        spellchecked = check_spelling(text)
+        self._last_user_message = spellchecked
 
     # Debug and human evaluation function (/evaluation_start mode in Telegram)
     # Should be moved somewhere else
@@ -280,6 +300,8 @@ class BotBrain:
             self._skill_exec_wrap(self._summarization_skill)
         elif clf_type == BotBrain.CLASSIFY_TOPIC:
             self._skill_exec_wrap(self._topic_skill)
+        elif clf_type == BotBrain.CLASSIFY_BYE:
+            self._skill_exec_wrap(self._bye_skill, self._last_user_message)
 
     def _get_intent(self, text):
         r = requests.post(self.INTENT_URL, json={'text': text})

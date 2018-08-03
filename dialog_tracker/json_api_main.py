@@ -58,7 +58,7 @@ def message():
     log_user('/message', update)
 
     fsm = chat_fsm[update.effective_chat.id]
-    fsm._last_user_message = update.message.text
+    fsm.set_user_message(update.message.text)
     fsm = chat_fsm[update.effective_chat.id]
     fsm.classify()
 
