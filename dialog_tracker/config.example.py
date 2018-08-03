@@ -1,5 +1,5 @@
 WAIT_TIME = 15
 WAIT_TOO_LONG = 60
-version = "17 (24.12.2017)"
+version = "20 (03.08.2018)"
 telegram_token = "PUT YOUR TELEGRAM TOKEN HERE"
 convai_token = "PUT YOUR CONVAI TOKEN HERE"
