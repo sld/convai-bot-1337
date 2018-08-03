@@ -75,7 +75,7 @@ class DialogTracker:
                         self._log_user('_echo_cmd', update)
 
                         fsm = self._chat_fsm[update.effective_chat.id]
-                        fsm._last_user_message = update.message.text
+                        fsm.set_user_message(update.message.text)
                         if not fsm._text:
                             fsm._send_message('Text is not given. Please try to type /end and /test to reset the state and get text.')
                             continue

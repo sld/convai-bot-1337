@@ -96,3 +96,15 @@ services:
     restart: 'unless-stopped'
     environment:
       - PYTHONUNBUFFERED=1
+
+  spellchecker:
+    image: 'spellchecker:0.1'
+    build:
+      context: './spellchecker'
+    volumes:
+      - './spellchecker:/src'
+      - './spellchecker_model:/model'
+    command: python3.6 -u server.py
+    ports:
+      - '3050:3050'
+    restart: 'unless-stopped'

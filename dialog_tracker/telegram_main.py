@@ -163,7 +163,7 @@ class DialogTracker:
 
         username = self._user_name(update)
         fsm = self._users_fsm[update.effective_user.id]
-        fsm._last_user_message = update.message.text
+        fsm.set_user_message(update.message.text)
         user_id = update.effective_user.id
 
         # Evaluation choice checking

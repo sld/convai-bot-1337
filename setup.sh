@@ -16,3 +16,8 @@ cp data/CPU_epoch5_14.62.t7 opennmt_chitchat/data/
 wget https://www.dropbox.com/s/rx7heizq5y8wi2j/factoid_question_answerer_data.tar.gz
 tar -zxvf factoid_question_answerer_data.tar.gz
 cp -r factoid_question_answerer_data/* factoid_question_answerer
+
+
+# spellchecker
+mkdir spellchecker_model
+wget -qO- https://github.com/bakwc/JamSpell-models/raw/master/en.tar.gz | tar xvz -C spellchecker_model
