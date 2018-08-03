@@ -9,6 +9,7 @@ import skills.qa as qa
 import skills.chitchat as chitchat
 import skills.summary as summary
 import skills.topic as topic
+import skills.bye as bye
 
 from skills.utils import combinate_and_return_answer
 
