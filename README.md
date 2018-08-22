@@ -1,6 +1,6 @@
 # ConvAI bot#1337
 
-Skill-based Conversational Agent that took 1st place at 2017 NIPS Conversational Intelligence Challenge (http://convai.io).
+Skill-based Conversational Agent that took 1st place at 2017 NIPS Conversational Intelligence Challenge (http://convai.io/2017/).
 
 We still update our Conversational Agent and the latest version could be found in master branch.
 
