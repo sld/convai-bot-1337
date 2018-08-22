@@ -95,5 +95,8 @@ Please read CONTRIBUTING.md for details on our code of conduct, and the process 
 
 This project is licensed under the GPLv3 License - see the LICENSE file for details.
 
+# Other
+
+Fork of this bot in TOP-3 (infinity team) of [DeepHack Chat](http://deephack.me/chat) hackathon http://deephack.me/leaderboard_hack.
 
 
