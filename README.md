@@ -8,24 +8,20 @@ Here is submitted to **ConvAI Finals version** of the Agent (on 12th November): 
 
 # Abstract
 
-The chatbot developed for the ConvAI challenge. Our bot is
-capable of conversing with humans about given text (e.g. a paragraph from
-Wikipedia article). The conversation is enabled by a set of skills, including
-chit-chat, topics detection, text summarization, question answering and question
-generation. The system has been trained in a supervised fashion to select an
-appropriate skill for generating a response. Furthermore, we have developed an
-overall dialog quality scorer and next utterance scorer to correct agent's
-policy. Our bot is implemented with open source software and open data; it is
-self-hosted, and employs a supervised dialog manager with a linear hierarchy.
-The latter allows a researcher to focus on skill implementation rather than
-finite state machine development.
+We present bot#1337: a dialog system developed for the 1st NIPS Conversational Intelligence Challenge 2017 (ConvAI). The aim of the competition was to implement a bot capable of conversing with humans based on a given passage of text. To enable conversation, we implemented a set of skills for our bot, including chit-chat, topic detection, text summarization, question answering and question generation. The system has been trained in a supervised setting using a dialogue manager to select an appropriate skill for generating a response. The latter allows a developer to focus on the skill implementation rather than the finite state machine based dialog manager. The proposed system bot#1337 won the competition with an average dialogue quality score of 2.78 out of 5 given by human evaluators. Source code and trained models for the bot#1337 are available on GitHub.
 
 # Getting Started
 
 For brief overview the bot#1337 take a look on next resources:
 
+- [COLING 2018 Paper](http://aclweb.org/anthology/C18-1312)
 - [one-page abstract](https://www.researchgate.net/publication/322037222_Skill-based_Conversational_Agent)
 - [presentation](https://www.researchgate.net/publication/322037067_Skill-based_Conversational_Agent)
+
+# Telegram Bot demo and JSON API
+
+- Conversational agent demonstration is accessible as a Telegram bot: https://t.me/ConvAI1337Bot. 
+- Also we have public JSON API that documented at https://github.com/sld/convai-bot-1337/wiki/Api-Documentation.
 
 ## Prerequisites
 
