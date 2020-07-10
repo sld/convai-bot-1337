@@ -1,3 +1,4 @@
 flask==0.12
 nltk==3.2.4
 gunicorn==19.7
+werkzeug==0.16.1

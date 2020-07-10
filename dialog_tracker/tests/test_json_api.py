@@ -6,6 +6,7 @@ from sys import argv
 def start_chat(url, text=''):
     url = url + '/start'
     r = requests.post(url, json={'text': text})
+    print(r)
     return r.json()
 
 

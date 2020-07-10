@@ -5,7 +5,7 @@ WORKDIR /src
 RUN apt-get update
 
 RUN apt-get install -y software-properties-common
-RUN add-apt-repository ppa:jonathonf/python-3.6
+RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get update
 
 RUN apt install -y build-essential libstdc++6 wget git swig libssl-dev python3.6 python3.6-dev python3-pip locales

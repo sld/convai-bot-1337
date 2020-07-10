@@ -5,3 +5,4 @@ jinja2
 requests==2.16.5
 flask==0.12
 ipython
+werkzeug==0.16.1
