@@ -1,3 +1,3 @@
-flask==0.12
+flask==1.0
 jamspell==0.0.11
 werkzeug==0.16.1
