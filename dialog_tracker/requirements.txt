@@ -4,5 +4,5 @@ fuzzywuzzy[speedup]==0.15.0
 requests==2.16.5
 nltk==3.2.4
 flask==0.12
-numpy==1.13.1
+numpy==1.21.0
 werkzeug==0.16.1
